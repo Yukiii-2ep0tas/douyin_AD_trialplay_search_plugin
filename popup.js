@@ -98,10 +98,26 @@ async function getActiveTab() {
   return tabs[0] || null;
 }
 
-async function sendToActiveTab(action, payload = {}) {
-  const tab = await getActiveTab();
+async function findTargetTab() {
+  const currentWindowTabs = await chrome.tabs.query({ currentWindow: true });
+  const activeMatchedTab = currentWindowTabs.find((tab) => tab.active && isTargetPageUrl(tab.url || ''));
+  if (activeMatchedTab?.id) {
+    return activeMatchedTab;
+  }
+
+  const currentWindowMatchedTab = currentWindowTabs.find((tab) => isTargetPageUrl(tab.url || ''));
+  if (currentWindowMatchedTab?.id) {
+    return currentWindowMatchedTab;
+  }
+
+  const allTabs = await chrome.tabs.query({});
+  return allTabs.find((tab) => isTargetPageUrl(tab.url || '')) || null;
+}
+
+async function sendToTargetTab(action, payload = {}) {
+  const tab = await findTargetTab();
   if (!tab?.id) {
-    return { success: false, error: '未找到当前活动标签页' };
+    return { success: false, error: '未找到试玩管理页面标签页' };
   }
 
   return new Promise((resolve) => {
@@ -281,7 +297,7 @@ function renderResults(items) {
 }
 
 async function handleExecuteAction(item, actionKey, button) {
-  const tab = await getActiveTab();
+  const tab = await findTargetTab();
   if (!isTargetPageUrl(tab?.url || '')) {
     showToast('请先切到试玩管理页面后再执行操作', 'error');
     return;
@@ -291,7 +307,7 @@ async function handleExecuteAction(item, actionKey, button) {
   const originalText = button.textContent;
   button.textContent = '执行中...';
 
-  const result = await sendToActiveTab('executeDemogameAction', { item, actionKey });
+  const result = await sendToTargetTab('executeDemogameAction', { item, actionKey });
 
   button.textContent = originalText;
   button.disabled = false;
@@ -308,18 +324,19 @@ async function refreshOverview() {
   btnRefresh.textContent = '刷新中...';
 
   const activeTab = await getActiveTab();
+  const targetTab = await findTargetTab();
   const [loginState, savedData, summary, pageState] = await Promise.all([
     sendBackground('checkLoginState'),
     sendBackground('getSavedInfo'),
     sendBackground('getDemogameDatasetSummary'),
-    isTargetPageUrl(activeTab?.url || '') ? sendToActiveTab('getPageInfo') : Promise.resolve(null),
+    isTargetPageUrl(targetTab?.url || '') ? sendToTargetTab('getPageInfo') : Promise.resolve(null),
   ]);
 
   setLoginState(loginState);
   savedInfo.textContent = savedData?.saved
     ? `${formatTime(savedData.saved.savedAt)}（${savedData.saved.count} 个 Cookie）`
     : '尚未保存';
-  setPageState(activeTab, pageState);
+  setPageState(targetTab || activeTab, pageState);
   setCrawlSummary(summary);
   renderFilterSelect(
     filterPublishStatus,
@@ -370,7 +387,7 @@ async function handleClearCookies() {
 }
 
 async function handleStartCrawl() {
-  const tab = await getActiveTab();
+  const tab = await findTargetTab();
   if (!isTargetPageUrl(tab?.url || '')) {
     showToast('请先切到试玩管理页面', 'error');
     return;
@@ -379,7 +396,7 @@ async function handleStartCrawl() {
   btnStartCrawl.disabled = true;
   btnStartCrawl.textContent = '抓取中...';
 
-  const result = await sendToActiveTab('startDemogameCrawl');
+  const result = await sendToTargetTab('startDemogameCrawl');
   btnStartCrawl.textContent = '开始抓取';
 
   if (result?.success) {

@@ -2,3 +2,4 @@ node_modules/
 .DS_Store
 pw-search-test.cjs
 .trae/tmp-*.cjs
+.trae/artifacts/
