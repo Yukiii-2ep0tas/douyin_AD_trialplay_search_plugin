@@ -30,6 +30,7 @@ const toast = document.getElementById('toast');
 
 let toastTimer = null;
 let selectedResultId = null;
+let overviewRefreshTimer = null;
 
 function showToast(message, type = '') {
   clearTimeout(toastTimer);
@@ -396,6 +397,13 @@ async function refreshOverview() {
   btnRefresh.textContent = '刷新状态';
 }
 
+function scheduleOverviewRefresh() {
+  clearTimeout(overviewRefreshTimer);
+  overviewRefreshTimer = setTimeout(() => {
+    refreshOverview();
+  }, 150);
+}
+
 async function handleSaveCookies() {
   btnSave.disabled = true;
   const result = await sendBackground('saveCookies');
@@ -494,4 +502,18 @@ searchKeyword.addEventListener('keydown', (event) => {
 
 document.addEventListener('DOMContentLoaded', () => {
   refreshOverview();
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local') {
+    return;
+  }
+
+  if (
+    changes.demogame_dataset ||
+    changes.demogame_crawl_status ||
+    changes.saved_cookies
+  ) {
+    scheduleOverviewRefresh();
+  }
 });
