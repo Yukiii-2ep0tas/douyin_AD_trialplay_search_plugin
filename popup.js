@@ -98,20 +98,57 @@ async function getActiveTab() {
   return tabs[0] || null;
 }
 
+async function getTabPageInfo(tabId) {
+  if (!tabId) {
+    return null;
+  }
+
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, { action: 'getPageInfo' }, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+      resolve(response || null);
+    });
+  });
+}
+
 async function findTargetTab() {
   const currentWindowTabs = await chrome.tabs.query({ currentWindow: true });
+  const allTabs = await chrome.tabs.query({});
+  const candidateMap = new Map();
+
+  [...currentWindowTabs, ...allTabs]
+    .filter((tab) => isTargetPageUrl(tab.url || ''))
+    .forEach((tab) => {
+      candidateMap.set(tab.id, tab);
+    });
+
+  const candidates = Array.from(candidateMap.values());
+  if (!candidates.length) {
+    return null;
+  }
+
+  for (const tab of candidates) {
+    const pageInfo = await getTabPageInfo(tab.id);
+    if (pageInfo?.isTargetPage && pageInfo?.hasTable) {
+      return { ...tab, pageInfo };
+    }
+  }
+
   const activeMatchedTab = currentWindowTabs.find((tab) => tab.active && isTargetPageUrl(tab.url || ''));
   if (activeMatchedTab?.id) {
-    return activeMatchedTab;
+    return { ...activeMatchedTab, pageInfo: await getTabPageInfo(activeMatchedTab.id) };
   }
 
   const currentWindowMatchedTab = currentWindowTabs.find((tab) => isTargetPageUrl(tab.url || ''));
   if (currentWindowMatchedTab?.id) {
-    return currentWindowMatchedTab;
+    return { ...currentWindowMatchedTab, pageInfo: await getTabPageInfo(currentWindowMatchedTab.id) };
   }
 
-  const allTabs = await chrome.tabs.query({});
-  return allTabs.find((tab) => isTargetPageUrl(tab.url || '')) || null;
+  const fallbackTab = candidates[0];
+  return { ...fallbackTab, pageInfo: await getTabPageInfo(fallbackTab.id) };
 }
 
 async function sendToTargetTab(action, payload = {}) {
@@ -329,7 +366,7 @@ async function refreshOverview() {
     sendBackground('checkLoginState'),
     sendBackground('getSavedInfo'),
     sendBackground('getDemogameDatasetSummary'),
-    isTargetPageUrl(targetTab?.url || '') ? sendToTargetTab('getPageInfo') : Promise.resolve(null),
+    Promise.resolve(targetTab?.pageInfo || null),
   ]);
 
   setLoginState(loginState);
