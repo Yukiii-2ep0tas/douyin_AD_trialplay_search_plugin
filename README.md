@@ -8,9 +8,9 @@
 
 2、打开chrome，打开扩展程序页面的开发者模式，然后点“加载未打包的扩展程序”，选择解压后的文件夹。
 
-3、打开https://developer.open-douyin.com/demogame/list?tab=demogameManage，正常登陆账号
+3、打开https://developer.open-douyin.com/demogame/list?tab=demogameManage
 
-4、点击chrome右上角的插件图标，打开这个扩展程序，然后刷新页面
+4、正常登陆开放平台账号，点击chrome右上角的插件图标，打开这个扩展程序，然后刷新页面
 
 5、点击页面上新出现的“搜索助手”悬浮球，然后点击：1、“刷新状态”，2、“开始抓取”，等待抓取完成
 
