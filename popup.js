@@ -67,6 +67,10 @@ function notifyParentToClose() {
   }, '*');
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function formatTime(timestamp) {
   if (!timestamp) {
     return '-';
@@ -419,6 +423,11 @@ async function handleExecuteAction(item, actionKey, button) {
   if (!isTargetPageUrl(tab?.url || '')) {
     showToast('请先切到试玩管理页面后再执行操作', 'error');
     return;
+  }
+
+  if (isEmbeddedMode) {
+    notifyParentToClose();
+    await sleep(80);
   }
 
   button.disabled = true;

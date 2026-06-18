@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "audit:demogame": "node scripts/audit-demogame-flow.cjs",
-    "test:popup-ui": "node scripts/test-popup-ui.cjs"
+    "test:popup-ui": "node scripts/test-popup-ui.cjs",
+    "test:embedded-action": "node scripts/test-embedded-action.cjs"
   },
   "keywords": [],
   "author": "",

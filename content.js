@@ -84,8 +84,10 @@
         }
 
         .panel {
-          width: 740px;
-          height: 760px;
+          width: min(560px, calc(100vw - 32px));
+          height: min(760px, calc(100vh - 104px));
+          max-width: calc(100vw - 32px);
+          max-height: calc(100vh - 104px);
           border-radius: 18px;
           overflow: hidden;
           background: #fff;
@@ -130,6 +132,20 @@
 
         .fab:active {
           transform: scale(0.98);
+        }
+
+        @media (max-width: 720px) {
+          .dock {
+            right: 12px;
+            bottom: 16px;
+          }
+
+          .panel {
+            width: calc(100vw - 24px);
+            max-width: calc(100vw - 24px);
+            height: min(720px, calc(100vh - 96px));
+            max-height: calc(100vh - 96px);
+          }
         }
       </style>
       <div class="dock">
