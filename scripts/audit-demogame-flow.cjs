@@ -147,10 +147,39 @@ async function gotoLastPageCandidate(page) {
 }
 
 async function waitForCrawlFinished(popupPage) {
-  await popupPage.waitForFunction(() => {
-    const node = document.getElementById('crawlStatus');
-    return node && /抓取完成/.test(node.textContent || '');
-  }, { timeout: 120000 });
+  throw new Error('请改用 waitForFreshDatasetAfterCrawl');
+}
+
+async function waitForFreshDatasetAfterCrawl(popupPage, crawlStartedAt) {
+  await popupPage.waitForFunction(
+    ({ startedAt }) => {
+      return new Promise((resolve) => {
+        chrome.storage.local.get(['demogame_dataset', 'demogame_crawl_status'], (data) => {
+          const dataset = data.demogame_dataset;
+          const status = data.demogame_crawl_status;
+          resolve(Boolean(
+            dataset?.capturedAt >= startedAt
+            && dataset?.totalItems > 0
+            && status?.state === 'success'
+            && /抓取完成/.test(status?.message || '')
+          ));
+        });
+      });
+    },
+    { startedAt: crawlStartedAt },
+    { timeout: 120000 }
+  );
+}
+
+async function readDatasetFromPopup(popupPage) {
+  return popupPage.evaluate(() => new Promise((resolve) => {
+    chrome.storage.local.get(['demogame_dataset', 'demogame_crawl_status'], (data) => {
+      resolve({
+        dataset: data.demogame_dataset || null,
+        crawlStatus: data.demogame_crawl_status || null,
+      });
+    });
+  }));
 }
 
 async function searchAndAssert(popupPage, keyword, expectedGameName) {
@@ -211,6 +240,7 @@ async function main() {
     startedAt: new Date().toISOString(),
     steps: [],
   };
+  let testFailed = false;
 
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless: false,
@@ -242,8 +272,19 @@ async function main() {
     report.steps.push({ step: 'clear-dataset' });
 
     logStep('执行抓取', '通过 popup 触发全量抓取');
+    const crawlStartedAt = Date.now();
     await popupPage.click('#btnStartCrawl');
-    await waitForCrawlFinished(popupPage);
+    await waitForFreshDatasetAfterCrawl(popupPage, crawlStartedAt);
+    const datasetState = await readDatasetFromPopup(popupPage);
+    report.datasetSummary = {
+      totalItems: datasetState?.dataset?.totalItems || 0,
+      totalPages: datasetState?.dataset?.totalPages || 0,
+      firstItems: (datasetState?.dataset?.items || []).slice(0, 10).map((item) => ({
+        appId: item.appId,
+        gameName: item.gameName,
+        pageNo: item.pageNo,
+      })),
+    };
     await screenshot(popupPage, '03-crawl-finished');
     report.steps.push({ step: 'crawl-finished' });
 
@@ -252,6 +293,12 @@ async function main() {
     const candidate = await gotoLastPageCandidate(targetPage);
     if (!candidate.appId || !candidate.gameName) {
       throw new Error('候选样本缺少 AppID 或试玩游戏名');
+    }
+    const candidateInDataset = (datasetState?.dataset?.items || []).some((item) =>
+      item.appId === candidate.appId && item.gameName === candidate.gameName
+    );
+    if (!candidateInDataset) {
+      throw new Error(`抓取数据未包含跨页样本：${candidate.gameName} (${candidate.appId})`);
     }
     report.candidate = candidate;
     await screenshot(targetPage, '04-target-last-page');
@@ -292,6 +339,25 @@ async function main() {
       JSON.stringify(report, null, 2)
     );
     logStep('审计完成', `报告已写入 ${path.join(ARTIFACT_DIR, 'audit-report.json')}`);
+  } catch (error) {
+    testFailed = true;
+    report.finishedAt = new Date().toISOString();
+    report.success = false;
+    report.error = error.message;
+    try {
+      const pages = context.pages();
+      for (let index = 0; index < pages.length; index += 1) {
+        await screenshot(pages[index], `error-page-${index + 1}`);
+      }
+    } catch (screenshotError) {
+      report.screenshotError = screenshotError.message;
+    }
+    fs.writeFileSync(
+      path.join(ARTIFACT_DIR, 'audit-report.json'),
+      JSON.stringify(report, null, 2)
+    );
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+    throw error;
   } finally {
     const keepOpen = process.env.PW_KEEP_OPEN === '1';
     if (!keepOpen) {
