@@ -43,6 +43,62 @@ async function waitForTableOrManualLogin(page) {
   }
 }
 
+function isTargetUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.includes('developer.open-douyin.com')
+      && parsed.pathname === '/demogame/list'
+      && parsed.searchParams.get('tab') === 'demogameManage';
+  } catch (error) {
+    return false;
+  }
+}
+
+async function resolveReadyTargetPage(context, initialPage) {
+  const hasTable = async (page) => {
+    try {
+      return await page.locator(TABLE_SELECTOR).count() > 0;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const pickReadyPage = async () => {
+    for (const page of context.pages()) {
+      if (!isTargetUrl(page.url())) {
+        continue;
+      }
+      if (await hasTable(page)) {
+        return page;
+      }
+    }
+    return null;
+  };
+
+  const directHit = await pickReadyPage();
+  if (directHit) {
+    return { page: directHit, neededManualLogin: false };
+  }
+
+  try {
+    await initialPage.waitForSelector(TABLE_SELECTOR, { timeout: 15000 });
+    return { page: initialPage, neededManualLogin: false };
+  } catch (error) {
+    logStep('等待人工登录', '当前页面未直接进入试玩管理列表，请在打开的 Chromium 窗口中完成登录');
+
+    const deadline = Date.now() + 10 * 60 * 1000;
+    while (Date.now() < deadline) {
+      const readyPage = await pickReadyPage();
+      if (readyPage) {
+        await readyPage.bringToFront();
+        return { page: readyPage, neededManualLogin: true };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    throw new Error('等待人工登录超时，未找到已就绪的试玩管理页面');
+  }
+}
+
 async function getExtensionId(context) {
   let [serviceWorker] = context.serviceWorkers();
   if (!serviceWorker) {
@@ -170,9 +226,9 @@ async function main() {
     const extensionId = await getExtensionId(context);
     report.extensionId = extensionId;
 
-    const targetPage = await context.newPage();
-    await targetPage.goto(TARGET_URL, { waitUntil: 'domcontentloaded' });
-    const neededManualLogin = await waitForTableOrManualLogin(targetPage);
+    const initialPage = await context.newPage();
+    await initialPage.goto(TARGET_URL, { waitUntil: 'domcontentloaded' });
+    const { page: targetPage, neededManualLogin } = await resolveReadyTargetPage(context, initialPage);
     report.steps.push({ step: 'open-target-page', neededManualLogin });
     await screenshot(targetPage, '01-target-page-ready');
 
