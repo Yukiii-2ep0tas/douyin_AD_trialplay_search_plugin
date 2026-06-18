@@ -7,6 +7,7 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 const EXTENSION_PATH = PROJECT_ROOT;
 const TARGET_URL = 'https://developer.open-douyin.com/demogame/list?tab=demogameManage';
 const ARTIFACT_DIR = path.join(PROJECT_ROOT, '.trae', 'artifacts', 'playwright-demogame');
+const COOKIE_FILE = path.join(ARTIFACT_DIR, 'open-douyin-cookies.json');
 const TABLE_SELECTOR = 'table.semi-dy-open-table[role="treegrid"]';
 const PAGE_ROW_SELECTOR = 'tbody tr.semi-dy-open-table-row';
 const PAGE_CELL_SELECTOR = 'td.semi-dy-open-table-row-cell';
@@ -19,6 +20,18 @@ function logStep(step, detail) {
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
+}
+
+function readJsonFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function writeJsonFile(filePath, value) {
+  ensureDir(path.dirname(filePath));
+  fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
 }
 
 async function screenshot(page, name) {
@@ -41,6 +54,24 @@ async function waitForTableOrManualLogin(page) {
     );
     return true;
   }
+}
+
+async function restorePersistedCookies(context) {
+  const savedCookies = readJsonFile(COOKIE_FILE);
+  if (!Array.isArray(savedCookies) || !savedCookies.length) {
+    return { restored: false, count: 0 };
+  }
+  await context.addCookies(savedCookies);
+  return { restored: true, count: savedCookies.length };
+}
+
+async function persistCurrentCookies(context) {
+  const cookies = await context.cookies();
+  const filtered = cookies.filter((cookie) =>
+    /(^|\.)open-douyin\.com$/.test(cookie.domain) || /(^|\.)douyin\.com$/.test(cookie.domain)
+  );
+  writeJsonFile(COOKIE_FILE, filtered);
+  return { count: filtered.length, filePath: COOKIE_FILE };
 }
 
 function isTargetUrl(url) {
@@ -255,11 +286,21 @@ async function main() {
     logStep('启动 Chromium', '已加载本地扩展');
     const extensionId = await getExtensionId(context);
     report.extensionId = extensionId;
+    const cookieState = await restorePersistedCookies(context);
+    report.cookieRestore = cookieState;
+    if (cookieState.restored) {
+      logStep('恢复 Cookie', `已注入 ${cookieState.count} 个持久化 Cookie`);
+    }
 
     const initialPage = await context.newPage();
     await initialPage.goto(TARGET_URL, { waitUntil: 'domcontentloaded' });
     const { page: targetPage, neededManualLogin } = await resolveReadyTargetPage(context, initialPage);
     report.steps.push({ step: 'open-target-page', neededManualLogin });
+    if (neededManualLogin) {
+      const persisted = await persistCurrentCookies(context);
+      report.cookiePersist = persisted;
+      logStep('保存 Cookie', `首次人工登录完成后已保存 ${persisted.count} 个 Cookie`);
+    }
     await screenshot(targetPage, '01-target-page-ready');
 
     const popupPage = await context.newPage();
