@@ -2,6 +2,9 @@
 
 这是一个给抖音开放平台小游戏试玩素材管理页添加搜索功能的 Chrome 插件。
 
+<img width="410" height="771" alt="image" src="https://github.com/user-attachments/assets/38ca64c0-bd27-41b9-8fb1-4414685d5517" />
+
+
 ## 0、最简单使用方法：
 1、下载并解压：
 `public-dist/douyin-open-helper-public.zip`
