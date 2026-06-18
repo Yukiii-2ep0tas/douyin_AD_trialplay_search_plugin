@@ -81,10 +81,12 @@
           align-items: flex-end;
           gap: 12px;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          touch-action: none;
+          user-select: none;
         }
 
         .panel {
-          width: min(560px, calc(100vw - 32px));
+          width: min(400px, calc(100vw - 32px));
           height: min(760px, calc(100vh - 104px));
           max-width: calc(100vw - 32px);
           max-height: calc(100vh - 104px);
@@ -113,17 +115,19 @@
         }
 
         .fab {
-          width: 58px;
-          height: 58px;
+          min-width: 96px;
+          height: 46px;
+          padding: 0 16px;
           border: none;
           border-radius: 999px;
           background: linear-gradient(135deg, #fe2c55, #ff6b83);
           color: #fff;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 700;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.2px;
           box-shadow: 0 12px 28px rgba(254, 44, 85, 0.35);
           cursor: pointer;
+          white-space: nowrap;
         }
 
         .fab:hover {
@@ -146,30 +150,107 @@
             height: min(720px, calc(100vh - 96px));
             max-height: calc(100vh - 96px);
           }
+
+          .fab {
+            min-width: 88px;
+            height: 42px;
+            padding: 0 14px;
+          }
         }
       </style>
       <div class="dock">
         <div class="panel" id="helperPanel">
           <iframe src="${iframeUrl}" title="抖音开放平台助手"></iframe>
         </div>
-        <button class="fab" id="helperFab" type="button" aria-label="打开助手">助手</button>
+        <button class="fab" id="helperFab" type="button" aria-label="打开搜索助手">搜索助手</button>
       </div>
     `;
 
+    const dock = shadow.querySelector('.dock');
     const panel = shadow.getElementById('helperPanel');
     const fab = shadow.getElementById('helperFab');
     let open = false;
+    let suppressClick = false;
+    let dragState = null;
 
     const setOpen = (value) => {
       open = Boolean(value);
       panel.classList.toggle('open', open);
-      fab.textContent = open ? '关闭' : '助手';
-      fab.setAttribute('aria-label', open ? '关闭助手' : '打开助手');
+      fab.textContent = open ? '收起助手' : '搜索助手';
+      fab.setAttribute('aria-label', open ? '收起搜索助手' : '打开搜索助手');
     };
 
     fab.addEventListener('click', () => {
+      if (suppressClick) {
+        suppressClick = false;
+        return;
+      }
       setOpen(!open);
     });
+
+    const clampDockPosition = (left, top) => {
+      const dockRect = dock.getBoundingClientRect();
+      const maxLeft = Math.max(8, window.innerWidth - dockRect.width - 8);
+      const maxTop = Math.max(8, window.innerHeight - dockRect.height - 8);
+      return {
+        left: Math.min(Math.max(8, left), maxLeft),
+        top: Math.min(Math.max(8, top), maxTop),
+      };
+    };
+
+    const setDockPosition = (left, top) => {
+      const next = clampDockPosition(left, top);
+      dock.style.left = `${next.left}px`;
+      dock.style.top = `${next.top}px`;
+      dock.style.right = 'auto';
+      dock.style.bottom = 'auto';
+    };
+
+    fab.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+      const rect = dock.getBoundingClientRect();
+      dragState = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        left: rect.left,
+        top: rect.top,
+        moved: false,
+      };
+      fab.setPointerCapture(event.pointerId);
+    });
+
+    fab.addEventListener('pointermove', (event) => {
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+      const deltaX = event.clientX - dragState.startX;
+      const deltaY = event.clientY - dragState.startY;
+      if (!dragState.moved && Math.hypot(deltaX, deltaY) < 6) {
+        return;
+      }
+      dragState.moved = true;
+      suppressClick = true;
+      setDockPosition(dragState.left + deltaX, dragState.top + deltaY);
+    });
+
+    const finishDrag = (event) => {
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+      if (dragState.moved) {
+        const deltaX = event.clientX - dragState.startX;
+        const deltaY = event.clientY - dragState.startY;
+        setDockPosition(dragState.left + deltaX, dragState.top + deltaY);
+      }
+      dragState = null;
+      fab.releasePointerCapture(event.pointerId);
+    };
+
+    fab.addEventListener('pointerup', finishDrag);
+    fab.addEventListener('pointercancel', finishDrag);
 
     const extensionOrigin = new URL(chrome.runtime.getURL('popup.html')).origin;
 

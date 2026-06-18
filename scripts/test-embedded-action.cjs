@@ -51,6 +51,61 @@ async function openEmbeddedPanel(page) {
   }, { timeout: 10000 });
 }
 
+async function assertFabLabelAndDrag(page) {
+  const before = await page.evaluate(() => {
+    const host = document.getElementById('douyin-open-helper-host');
+    const fab = host?.shadowRoot?.getElementById('helperFab');
+    const dock = host?.shadowRoot?.querySelector('.dock');
+    if (!fab || !dock) {
+      return null;
+    }
+    const fabRect = fab.getBoundingClientRect();
+    const dockRect = dock.getBoundingClientRect();
+    return {
+      text: fab.textContent || '',
+      fabCenterX: fabRect.left + fabRect.width / 2,
+      fabCenterY: fabRect.top + fabRect.height / 2,
+      left: dockRect.left,
+      top: dockRect.top,
+    };
+  });
+
+  if (!before) {
+    throw new Error('未找到悬浮按钮');
+  }
+
+  if (before.text.trim() !== '搜索助手') {
+    throw new Error(`悬浮按钮文案异常: ${before.text}`);
+  }
+
+  await page.mouse.move(before.fabCenterX, before.fabCenterY);
+  await page.mouse.down();
+  await page.mouse.move(before.fabCenterX - 120, before.fabCenterY - 80, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+
+  const after = await page.evaluate(() => {
+    const host = document.getElementById('douyin-open-helper-host');
+    const dock = host?.shadowRoot?.querySelector('.dock');
+    if (!dock) {
+      return null;
+    }
+    const dockRect = dock.getBoundingClientRect();
+    return {
+      left: dockRect.left,
+      top: dockRect.top,
+    };
+  });
+
+  if (!after) {
+    throw new Error('拖拽后未找到悬浮按钮容器');
+  }
+
+  if (Math.abs(after.left - before.left) < 40 && Math.abs(after.top - before.top) < 30) {
+    throw new Error(`悬浮按钮拖拽后位置变化不足: before=${JSON.stringify(before)}, after=${JSON.stringify(after)}`);
+  }
+}
+
 async function waitForEmbeddedFrame(page, extensionId) {
   await page.waitForFunction((expectedOrigin) => {
     const host = document.getElementById('douyin-open-helper-host');
@@ -217,6 +272,7 @@ async function main() {
     const page = await context.newPage();
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector(TABLE_SELECTOR, { timeout: 20000 });
+    await assertFabLabelAndDrag(page);
     await openEmbeddedPanel(page);
     await assertPanelInsideViewport(page);
 

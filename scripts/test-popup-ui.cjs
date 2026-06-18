@@ -15,6 +15,27 @@ async function getExtensionId(context) {
 }
 
 async function seedMockData(page) {
+  const items = Array.from({ length: 8 }, (_, index) => ({
+    id: `mock-${index + 1}`,
+    appId: `ttmockappid${String(index + 1).padStart(3, '0')}`,
+    gameName: index === 0 ? '三角形行动' : `试玩测试游戏${index + 1}`,
+    pageNo: 2,
+    itemIndex: index,
+    fields: {
+      'App ID': `ttmockappid${String(index + 1).padStart(3, '0')}`,
+      '试玩游戏名': index === 0 ? '三角形行动' : `试玩测试游戏${index + 1}`,
+      '发布状态': index % 2 === 0 ? '已上线' : '未发布',
+      '是否关联广告计划': index % 2 === 0 ? '否' : '是',
+      'MaterialID': index === 0 ? '123456789' : String(123456789 + index),
+      '描述': `mock 描述 ${index + 1}`,
+    },
+    operations: [
+      { key: 'edit', label: '修改', clickable: true, href: null, hrefAttr: null, executionMode: 'dom-click' },
+      { key: 'delete', label: '删除', clickable: index % 3 !== 0, href: null, hrefAttr: null, executionMode: 'dom-click' },
+      { key: 'changeLog', label: '变更日志', clickable: true, href: null, hrefAttr: null, executionMode: 'dom-click' },
+    ],
+  }));
+
   const payload = {
     version: 1,
     source: {
@@ -22,49 +43,8 @@ async function seedMockData(page) {
     },
     capturedAt: Date.now(),
     totalPages: 2,
-    totalItems: 2,
-    items: [
-      {
-        id: 'mock-1',
-        appId: 'ttmockappid001',
-        gameName: '三角形行动',
-        pageNo: 2,
-        itemIndex: 0,
-        fields: {
-          'App ID': 'ttmockappid001',
-          '试玩游戏名': '三角形行动',
-          '发布状态': '已上线',
-          '是否关联广告计划': '否',
-          'MaterialID': '123456789',
-          '描述': 'mock 描述',
-        },
-        operations: [
-          { key: 'edit', label: '修改', clickable: true, href: null, hrefAttr: null, executionMode: 'dom-click' },
-          { key: 'delete', label: '删除', clickable: false, href: null, hrefAttr: null, executionMode: 'dom-click' },
-          { key: 'changeLog', label: '变更日志', clickable: true, href: null, hrefAttr: null, executionMode: 'dom-click' },
-        ],
-      },
-      {
-        id: 'mock-2',
-        appId: 'ttmockappid002',
-        gameName: '商业化试玩',
-        pageNo: 2,
-        itemIndex: 1,
-        fields: {
-          'App ID': 'ttmockappid002',
-          '试玩游戏名': '商业化试玩',
-          '发布状态': '未发布',
-          '是否关联广告计划': '是',
-          'MaterialID': '-',
-          '描述': '另一条 mock',
-        },
-        operations: [
-          { key: 'edit', label: '修改', clickable: true, href: null, hrefAttr: null, executionMode: 'dom-click' },
-          { key: 'delete', label: '删除', clickable: true, href: null, hrefAttr: null, executionMode: 'dom-click' },
-          { key: 'changeLog', label: '变更日志', clickable: true, href: null, hrefAttr: null, executionMode: 'dom-click' },
-        ],
-      },
-    ],
+    totalItems: items.length,
+    items,
   };
 
   await page.evaluate(async (dataset) => {
@@ -119,7 +99,7 @@ async function main() {
     }
 
     await page.click('#btnToggleLogin');
-    await page.fill('#searchKeyword', '三角形');
+    await page.fill('#searchKeyword', '试玩');
     await page.click('#btnSearch');
     await page.waitForTimeout(400);
 
@@ -129,13 +109,32 @@ async function main() {
     }
 
     const resultText = await page.locator('#resultList').innerText();
-    if (!resultText.includes('三角形行动') || !resultText.includes('显示日志')) {
+    if (!resultText.includes('试玩测试游戏2') || !resultText.includes('显示日志')) {
       throw new Error('搜索结果未正确显示游戏名和行内动作按钮');
     }
 
     const detailText = await page.locator('#detailFields').innerText();
     if (detailText.includes('原始文本')) {
       throw new Error('详情区不应显示原始文本');
+    }
+
+    const scrollInfo = await page.evaluate(() => ({
+      overflowY: window.getComputedStyle(document.body).overflowY,
+      bodyScrollHeight: document.body.scrollHeight,
+      innerHeight: window.innerHeight,
+      resultOverflowY: window.getComputedStyle(document.getElementById('resultList')).overflowY,
+    }));
+
+    if (scrollInfo.overflowY === 'hidden') {
+      throw new Error('popup 主体不应禁止纵向滚动');
+    }
+
+    if (scrollInfo.resultOverflowY === 'auto') {
+      throw new Error('结果列表不应继续单独占用滚动容器');
+    }
+
+    if (scrollInfo.bodyScrollHeight <= scrollInfo.innerHeight) {
+      throw new Error('搜索结果较多时，popup 主体应产生可滚动高度');
     }
 
     console.log('popup ui test ok');
