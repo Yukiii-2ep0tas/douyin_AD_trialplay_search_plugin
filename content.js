@@ -117,9 +117,11 @@
   }
 
   function getTableSignature(table) {
-    const firstRow = table?.querySelector(ROW_SELECTOR);
-    const firstRowText = normalizeText(firstRow?.innerText || '');
-    return `${getCurrentPageNumber()}::${firstRowText}`;
+    const rowTexts = Array.from(table?.querySelectorAll(ROW_SELECTOR) || [])
+      .slice(0, 5)
+      .map((row) => normalizeText(row.innerText))
+      .filter(Boolean);
+    return rowTexts.join(' || ');
   }
 
   function isElementDisabled(element) {
@@ -231,10 +233,8 @@
 
       const currentSignature = getTableSignature(table);
       const currentPageNo = getCurrentPageNumber();
-      if (currentSignature && currentSignature !== previousSignature) {
-        return true;
-      }
-      if (expectedPageNo && currentPageNo === expectedPageNo) {
+      const contentChanged = currentSignature && currentSignature !== previousSignature;
+      if (contentChanged && (!expectedPageNo || currentPageNo === expectedPageNo)) {
         return true;
       }
     }
