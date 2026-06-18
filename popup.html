@@ -23,60 +23,117 @@
       padding: 0;
     }
 
+    html,
     body {
-      width: 420px;
-      min-height: 640px;
+      height: 100%;
+    }
+
+    body {
+      width: 560px;
+      min-height: 560px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
+      overflow: hidden;
+    }
+
+    body.embedded {
+      width: 100%;
+      min-height: 100%;
     }
 
     .header {
-      padding: 16px 18px;
+      padding: 10px 12px;
       background: linear-gradient(135deg, var(--primary), #ff6b83);
       color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .header-main {
+      min-width: 0;
     }
 
     .header h1 {
-      font-size: 17px;
+      font-size: 15px;
       font-weight: 600;
+      line-height: 1.2;
     }
 
     .header p {
-      margin-top: 4px;
-      font-size: 12px;
+      margin-top: 2px;
+      font-size: 11px;
       opacity: 0.9;
     }
 
-    .content {
-      padding: 14px;
+    .header-actions {
       display: flex;
-      flex-direction: column;
-      gap: 12px;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-btn.hidden {
+      display: none;
+    }
+
+    .content {
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      height: calc(100% - 60px);
+      align-content: start;
+    }
+
+    body:not(.embedded) .content {
+      min-height: calc(560px - 60px);
     }
 
     .section {
       background: var(--panel);
-      border-radius: 12px;
-      padding: 14px;
+      border-radius: 10px;
+      padding: 10px;
       box-shadow: 0 1px 4px rgba(15, 35, 95, 0.08);
+      min-width: 0;
     }
 
     .section h2 {
-      font-size: 14px;
-      margin-bottom: 10px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
+
+    .section.compact {
+      padding-bottom: 8px;
     }
 
     .meta-list {
       display: grid;
-      gap: 8px;
+      gap: 5px;
     }
 
     .meta-item {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
-      font-size: 12px;
+      gap: 8px;
+      font-size: 11px;
     }
 
     .meta-item .label {
@@ -114,19 +171,19 @@
     }
 
     .btn-group {
-      margin-top: 10px;
+      margin-top: 8px;
     }
 
     .btn {
       border: 1px solid transparent;
-      border-radius: 9px;
-      padding: 10px 12px;
-      font-size: 12px;
+      border-radius: 8px;
+      padding: 7px 9px;
+      font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
       flex: 1;
-      min-width: 110px;
+      min-width: 90px;
     }
 
     .btn:disabled {
@@ -156,23 +213,23 @@
     }
 
     .hint {
-      margin-top: 8px;
+      margin-top: 6px;
       color: var(--muted);
-      font-size: 11px;
-      line-height: 1.5;
+      font-size: 10px;
+      line-height: 1.4;
     }
 
     .search-form {
       display: grid;
-      gap: 8px;
+      gap: 6px;
     }
 
     .input {
       width: 100%;
       border: 1px solid var(--border);
-      border-radius: 9px;
-      padding: 10px 12px;
-      font-size: 13px;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
       background: #fff;
     }
 
@@ -183,22 +240,22 @@
     }
 
     .result-summary {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .result-list {
       display: grid;
-      gap: 8px;
-      max-height: 220px;
+      gap: 6px;
+      max-height: 170px;
       overflow-y: auto;
     }
 
     .result-item {
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px;
+      border-radius: 8px;
+      padding: 8px;
       background: #fbfcff;
       cursor: pointer;
     }
@@ -209,49 +266,49 @@
     }
 
     .result-title {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     .result-meta {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
-      line-height: 1.5;
+      line-height: 1.35;
     }
 
     .detail-box {
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
       background: #fbfcff;
-      padding: 10px;
-      max-height: 220px;
+      padding: 8px;
+      max-height: 214px;
       overflow: auto;
-      font-size: 12px;
-      line-height: 1.6;
+      font-size: 11px;
+      line-height: 1.45;
       white-space: pre-wrap;
       word-break: break-word;
     }
 
     .detail-actions {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .detail-actions .btn {
-      flex: 1 1 110px;
-      min-width: 110px;
+      flex: 1 1 88px;
+      min-width: 88px;
     }
 
     .empty {
-      padding: 18px 10px;
+      padding: 14px 8px;
       text-align: center;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11px;
       border: 1px dashed var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
       background: #fcfcfd;
     }
 
@@ -281,16 +338,30 @@
     .toast.error {
       background: var(--danger);
     }
+
+    #sectionSearch {
+      grid-column: 1 / span 2;
+    }
+
+    #sectionResults,
+    #sectionDetail {
+      min-height: 0;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>抖音开放平台助手</h1>
-    <p>登录持久化、试玩管理抓取与本地检索</p>
+    <div class="header-main">
+      <h1>抖音开放平台助手</h1>
+      <p>登录持久化、试玩管理抓取与本地检索</p>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn hidden" id="btnClosePanel" title="关闭面板" aria-label="关闭面板">×</button>
+    </div>
   </div>
 
   <div class="content">
-    <section class="section">
+    <section class="section compact" id="sectionLogin">
       <h2>登录状态</h2>
       <div class="meta-list">
         <div class="meta-item">
@@ -313,7 +384,7 @@
       </div>
     </section>
 
-    <section class="section">
+    <section class="section compact" id="sectionCrawl">
       <h2>试玩管理抓取</h2>
       <div class="meta-list">
         <div class="meta-item">
@@ -341,7 +412,7 @@
       <div class="hint" id="crawlHint">请切到试玩管理页面后执行抓取。抓取过程中请勿手动翻页。</div>
     </section>
 
-    <section class="section">
+    <section class="section compact" id="sectionSearch">
       <h2>本地搜索</h2>
       <div class="search-form">
         <input class="input" id="searchKeyword" placeholder="搜索 AppID 或试玩游戏名">
@@ -361,7 +432,7 @@
       <div class="hint">规则：单关键字混合匹配 AppID 与试玩游戏名，并支持按发布状态、是否关联广告计划筛选。</div>
     </section>
 
-    <section class="section">
+    <section class="section compact" id="sectionResults">
       <h2>搜索结果</h2>
       <div class="result-summary" id="resultSummary">暂无搜索结果</div>
       <div class="result-list" id="resultList">
@@ -369,7 +440,7 @@
       </div>
     </section>
 
-    <section class="section">
+    <section class="section compact" id="sectionDetail">
       <h2>结果详情</h2>
       <div class="detail-actions" id="detailActions">
         <button class="btn btn-secondary" disabled>先选择一个搜索结果</button>

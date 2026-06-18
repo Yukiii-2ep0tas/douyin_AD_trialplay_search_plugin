@@ -38,5 +38,17 @@
       "js": ["content.js"],
       "run_at": "document_idle"
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "popup.html",
+        "popup.js",
+        "icons/icon16.png",
+        "icons/icon48.png",
+        "icons/icon128.png"
+      ],
+      "matches": ["*://*.open-douyin.com/*"]
+    }
   ]
 }

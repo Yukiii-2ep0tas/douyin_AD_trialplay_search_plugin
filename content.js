@@ -43,6 +43,133 @@
     return url.pathname === TARGET_PATH && url.searchParams.get('tab') === TARGET_TAB;
   }
 
+  function ensureFloatingAssistant() {
+    const hostId = 'douyin-open-helper-host';
+    let host = document.getElementById(hostId);
+
+    if (!isTargetPage()) {
+      if (host) {
+        host.remove();
+      }
+      return;
+    }
+
+    if (host) {
+      return;
+    }
+
+    host = document.createElement('div');
+    host.id = hostId;
+    document.documentElement.appendChild(host);
+
+    const shadow = host.attachShadow({ mode: 'open' });
+    const iframeUrl = chrome.runtime.getURL('popup.html?embedded=1');
+
+    shadow.innerHTML = `
+      <style>
+        :host {
+          all: initial;
+        }
+
+        .dock {
+          position: fixed;
+          right: 20px;
+          bottom: 24px;
+          z-index: 2147483647;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 12px;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .panel {
+          width: 580px;
+          height: 560px;
+          border-radius: 18px;
+          overflow: hidden;
+          background: #fff;
+          box-shadow: 0 20px 64px rgba(15, 35, 95, 0.18);
+          border: 1px solid rgba(29, 33, 41, 0.08);
+          opacity: 0;
+          transform: translateY(8px) scale(0.98);
+          pointer-events: none;
+          transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+
+        .panel.open {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          pointer-events: auto;
+        }
+
+        iframe {
+          width: 100%;
+          height: 100%;
+          border: 0;
+          background: #f5f7fa;
+        }
+
+        .fab {
+          width: 58px;
+          height: 58px;
+          border: none;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #fe2c55, #ff6b83);
+          color: #fff;
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: 0.5px;
+          box-shadow: 0 12px 28px rgba(254, 44, 85, 0.35);
+          cursor: pointer;
+        }
+
+        .fab:hover {
+          filter: brightness(0.98);
+        }
+
+        .fab:active {
+          transform: scale(0.98);
+        }
+      </style>
+      <div class="dock">
+        <div class="panel" id="helperPanel">
+          <iframe src="${iframeUrl}" title="抖音开放平台助手"></iframe>
+        </div>
+        <button class="fab" id="helperFab" type="button" aria-label="打开助手">助手</button>
+      </div>
+    `;
+
+    const panel = shadow.getElementById('helperPanel');
+    const fab = shadow.getElementById('helperFab');
+    let open = false;
+
+    const setOpen = (value) => {
+      open = Boolean(value);
+      panel.classList.toggle('open', open);
+      fab.textContent = open ? '关闭' : '助手';
+      fab.setAttribute('aria-label', open ? '关闭助手' : '打开助手');
+    };
+
+    fab.addEventListener('click', () => {
+      setOpen(!open);
+    });
+
+    const extensionOrigin = new URL(chrome.runtime.getURL('popup.html')).origin;
+
+    window.addEventListener('message', (event) => {
+      if (!event.data || event.origin !== extensionOrigin) {
+        return;
+      }
+      if (
+        event.data.source === 'douyin-open-helper'
+        && event.data.action === 'close-embedded-panel'
+      ) {
+        setOpen(false);
+      }
+    });
+  }
+
   function getTargetTable() {
     return document.querySelector(TABLE_SELECTOR);
   }
@@ -488,6 +615,12 @@
       subtree: true,
     });
   }
+
+  ensureFloatingAssistant();
+
+  setInterval(() => {
+    ensureFloatingAssistant();
+  }, 1500);
 
   setInterval(() => {
     chrome.runtime.sendMessage({ action: 'checkLoginState' }, () => {});

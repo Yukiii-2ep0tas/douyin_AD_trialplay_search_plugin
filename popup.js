@@ -10,6 +10,7 @@ const btnRefresh = document.getElementById('btnRefresh');
 const btnClearDataset = document.getElementById('btnClearDataset');
 const btnSearch = document.getElementById('btnSearch');
 const btnResetSearch = document.getElementById('btnResetSearch');
+const btnClosePanel = document.getElementById('btnClosePanel');
 
 const loginStatus = document.getElementById('loginStatus');
 const cookieCount = document.getElementById('cookieCount');
@@ -31,6 +32,13 @@ const toast = document.getElementById('toast');
 let toastTimer = null;
 let selectedResultId = null;
 let overviewRefreshTimer = null;
+const pageParams = new URLSearchParams(window.location.search);
+const isEmbeddedMode = pageParams.get('embedded') === '1';
+
+if (isEmbeddedMode) {
+  document.body.classList.add('embedded');
+  btnClosePanel?.classList.remove('hidden');
+}
 
 function showToast(message, type = '') {
   clearTimeout(toastTimer);
@@ -39,6 +47,16 @@ function showToast(message, type = '') {
   toastTimer = setTimeout(() => {
     toast.className = 'toast';
   }, 2500);
+}
+
+function notifyParentToClose() {
+  if (!isEmbeddedMode) {
+    return;
+  }
+  window.parent?.postMessage({
+    source: 'douyin-open-helper',
+    action: 'close-embedded-panel',
+  }, '*');
 }
 
 function formatTime(timestamp) {
@@ -494,6 +512,7 @@ btnRefresh.addEventListener('click', refreshOverview);
 btnClearDataset.addEventListener('click', handleClearDataset);
 btnSearch.addEventListener('click', handleSearch);
 btnResetSearch.addEventListener('click', handleResetSearch);
+btnClosePanel?.addEventListener('click', notifyParentToClose);
 searchKeyword.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     handleSearch();
