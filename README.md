@@ -1,0 +1,2 @@
+# douyin_AD_trialplay_search_plugin
+一款原生chrome插件，用于在抖音开放平台-小游戏试玩素材页面实现搜素功能
