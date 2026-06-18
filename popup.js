@@ -19,8 +19,9 @@ const crawlStatus = document.getElementById('crawlStatus');
 const crawlSummary = document.getElementById('crawlSummary');
 const capturedAt = document.getElementById('capturedAt');
 const crawlHint = document.getElementById('crawlHint');
-const searchAppId = document.getElementById('searchAppId');
-const searchGameName = document.getElementById('searchGameName');
+const searchKeyword = document.getElementById('searchKeyword');
+const filterPublishStatus = document.getElementById('filterPublishStatus');
+const filterPlanRelation = document.getElementById('filterPlanRelation');
 const resultSummary = document.getElementById('resultSummary');
 const resultList = document.getElementById('resultList');
 const detailActions = document.getElementById('detailActions');
@@ -160,6 +161,15 @@ function setCrawlSummary(summary) {
   const message = summary?.crawlStatus?.message || '等待抓取';
   const error = summary?.crawlStatus?.error;
   crawlStatus.textContent = error ? `${message}：${error}` : message;
+}
+
+function renderFilterSelect(selectNode, values, defaultLabel, currentValue = '') {
+  const safeValues = Array.isArray(values) ? values : [];
+  selectNode.innerHTML = [
+    `<option value="">${defaultLabel}</option>`,
+    ...safeValues.map((value) => `<option value="${value}">${value}</option>`),
+  ].join('');
+  selectNode.value = safeValues.includes(currentValue) ? currentValue : '';
 }
 
 function renderEmptyResults(message) {
@@ -311,6 +321,18 @@ async function refreshOverview() {
     : '尚未保存';
   setPageState(activeTab, pageState);
   setCrawlSummary(summary);
+  renderFilterSelect(
+    filterPublishStatus,
+    summary?.filterOptions?.publishStatuses,
+    '全部发布状态',
+    filterPublishStatus.value
+  );
+  renderFilterSelect(
+    filterPlanRelation,
+    summary?.filterOptions?.planRelations,
+    '全部广告计划关联状态',
+    filterPlanRelation.value
+  );
 
   if (!summary?.hasData) {
     renderEmptyResults('暂无抓取数据，请先执行抓取。');
@@ -377,9 +399,14 @@ async function handleClearDataset() {
 }
 
 async function handleSearch() {
-  const appId = searchAppId.value.trim();
-  const gameName = searchGameName.value.trim();
-  const result = await sendBackground('searchDemogameItems', { appId, gameName });
+  const queryText = searchKeyword.value.trim();
+  const publishStatus = filterPublishStatus.value.trim();
+  const planRelation = filterPlanRelation.value.trim();
+  const result = await sendBackground('searchDemogameItems', {
+    queryText,
+    publishStatus,
+    planRelation,
+  });
 
   if (!result?.success) {
     renderEmptyResults(result?.message || result?.error || '搜索失败');
@@ -391,8 +418,9 @@ async function handleSearch() {
 }
 
 function handleResetSearch() {
-  searchAppId.value = '';
-  searchGameName.value = '';
+  searchKeyword.value = '';
+  filterPublishStatus.value = '';
+  filterPlanRelation.value = '';
   renderEmptyResults('搜索条件已清空。请重新输入条件。');
 }
 
@@ -404,6 +432,11 @@ btnRefresh.addEventListener('click', refreshOverview);
 btnClearDataset.addEventListener('click', handleClearDataset);
 btnSearch.addEventListener('click', handleSearch);
 btnResetSearch.addEventListener('click', handleResetSearch);
+searchKeyword.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    handleSearch();
+  }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   refreshOverview();

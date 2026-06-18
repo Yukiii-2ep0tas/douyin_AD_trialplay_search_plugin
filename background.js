@@ -65,6 +65,20 @@ function getItemGameName(item) {
   );
 }
 
+function getItemPublishStatus(item) {
+  return normalizeString(
+    item?.publishStatus ||
+    item?.fields?.['发布状态']
+  );
+}
+
+function getItemPlanRelation(item) {
+  return normalizeString(
+    item?.planRelation ||
+    item?.fields?.['是否关联广告计划']
+  );
+}
+
 async function getAllCookies(domain) {
   try {
     return await chrome.cookies.getAll({ domain });
@@ -199,6 +213,8 @@ function buildSearchIndex(dataset) {
       gameName: getItemGameName(item),
       normalizedGameName: normalizeSearchValue(getItemGameName(item)),
       compactGameName: normalizeCompactValue(getItemGameName(item)),
+      publishStatus: getItemPublishStatus(item),
+      planRelation: getItemPlanRelation(item),
       pageNo: Number(item.pageNo) || 0,
       itemIndex: Number(item.itemIndex) || 0,
     })),
@@ -208,6 +224,8 @@ function buildSearchIndex(dataset) {
 function doesItemMatchSearch(item, query = {}) {
   const itemAppId = getItemAppId(item);
   const itemGameName = getItemGameName(item);
+  const itemPublishStatus = getItemPublishStatus(item);
+  const itemPlanRelation = getItemPlanRelation(item);
 
   const normalizedItemAppId = normalizeSearchValue(itemAppId);
   const compactItemAppId = normalizeCompactValue(itemAppId);
@@ -217,21 +235,22 @@ function doesItemMatchSearch(item, query = {}) {
   const normalizedRawText = normalizeSearchValue(item?.rawText || '');
   const compactRawText = normalizeCompactValue(item?.rawText || '');
 
-  const appIdMatch = !query.appId || (
-    normalizedItemAppId === query.normalizedAppId ||
-    compactItemAppId === query.compactAppId ||
-    normalizeSearchValue(item?.fields?.['App ID']) === query.normalizedAppId ||
-    normalizeCompactValue(item?.fields?.['App ID']) === query.compactAppId
+  const queryTextMatch = !query.queryText || (
+    normalizedItemAppId.includes(query.normalizedQueryText) ||
+    compactItemAppId.includes(query.compactQueryText) ||
+    normalizedItemGameName.includes(query.normalizedQueryText) ||
+    compactItemGameName.includes(query.compactQueryText) ||
+    normalizedRawText.includes(query.normalizedQueryText) ||
+    compactRawText.includes(query.compactQueryText)
   );
 
-  const gameNameMatch = !query.gameName || (
-    normalizedItemGameName.includes(query.normalizedGameName) ||
-    compactItemGameName.includes(query.compactGameName) ||
-    normalizedRawText.includes(query.normalizedGameName) ||
-    compactRawText.includes(query.compactGameName)
-  );
+  const publishStatusMatch = !query.publishStatus
+    || normalizeSearchValue(itemPublishStatus) === query.normalizedPublishStatus;
 
-  return appIdMatch && gameNameMatch;
+  const planRelationMatch = !query.planRelation
+    || normalizeSearchValue(itemPlanRelation) === query.normalizedPlanRelation;
+
+  return queryTextMatch && publishStatusMatch && planRelationMatch;
 }
 
 async function setCrawlStatus(payload = {}) {
@@ -293,6 +312,13 @@ async function getDemogameDatasetSummary() {
   ]);
   const dataset = data[DEMOGAME_DATASET_KEY] || null;
   const crawlStatus = data[DEMOGAME_CRAWL_STATUS_KEY] || null;
+  const items = Array.isArray(dataset?.items) ? dataset.items : [];
+  const publishStatuses = Array.from(new Set(
+    items.map((item) => getItemPublishStatus(item)).filter(Boolean)
+  )).sort((left, right) => left.localeCompare(right, 'zh-CN'));
+  const planRelations = Array.from(new Set(
+    items.map((item) => getItemPlanRelation(item)).filter(Boolean)
+  )).sort((left, right) => left.localeCompare(right, 'zh-CN'));
 
   return {
     success: true,
@@ -302,16 +328,26 @@ async function getDemogameDatasetSummary() {
     totalItems: dataset?.totalItems || 0,
     sourceUrl: dataset?.source?.url || TARGET_URL,
     crawlStatus,
+    filterOptions: {
+      publishStatuses,
+      planRelations,
+    },
   };
 }
 
 async function searchDemogameItems(payload = {}) {
-  const appId = normalizeString(payload.appId);
-  const gameName = normalizeString(payload.gameName);
-  const normalizedAppId = normalizeSearchValue(appId);
-  const compactAppId = normalizeCompactValue(appId);
-  const normalizedGameName = normalizeSearchValue(gameName);
-  const compactGameName = normalizeCompactValue(gameName);
+  const queryText = normalizeString(
+    payload.queryText ||
+    payload.keyword ||
+    payload.appId ||
+    payload.gameName
+  );
+  const publishStatus = normalizeString(payload.publishStatus);
+  const planRelation = normalizeString(payload.planRelation);
+  const normalizedQueryText = normalizeSearchValue(queryText);
+  const compactQueryText = normalizeCompactValue(queryText);
+  const normalizedPublishStatus = normalizeSearchValue(publishStatus);
+  const normalizedPlanRelation = normalizeSearchValue(planRelation);
 
   const data = await chrome.storage.local.get([
     DEMOGAME_DATASET_KEY,
@@ -325,8 +361,8 @@ async function searchDemogameItems(payload = {}) {
     return { success: false, message: '暂无抓取数据，请先执行抓取', items: [] };
   }
 
-  if (!appId && !gameName) {
-    return { success: false, message: '请至少输入一个搜索条件', items: [] };
+  if (!queryText && !publishStatus && !planRelation) {
+    return { success: false, message: '请至少输入关键字或选择一个筛选条件', items: [] };
   }
 
   if (!searchIndex?.entries?.length || searchIndex.totalItems !== dataset.items.length) {
@@ -335,12 +371,13 @@ async function searchDemogameItems(payload = {}) {
   }
 
   const query = {
-    appId,
-    normalizedAppId,
-    compactAppId,
-    gameName,
-    normalizedGameName,
-    compactGameName,
+    queryText,
+    normalizedQueryText,
+    compactQueryText,
+    publishStatus,
+    normalizedPublishStatus,
+    planRelation,
+    normalizedPlanRelation,
   };
 
   const items = dataset.items

@@ -79,6 +79,35 @@
     return null;
   }
 
+  async function gotoFirstPage() {
+    let attempts = 0;
+    while (getCurrentPageNumber() !== 1 && attempts < 30) {
+      attempts += 1;
+      const table = getTargetTable();
+      const beforeSignature = getTableSignature(table);
+      const firstPageButton = getPageButton(1);
+
+      if (firstPageButton) {
+        firstPageButton.click();
+      } else {
+        const previousButton = getPreviousButton();
+        if (isNextButtonDisabled(previousButton)) {
+          throw new Error('无法回到第一页');
+        }
+        previousButton.click();
+      }
+
+      const changed = await waitForPageChange(beforeSignature, 1);
+      if (!changed) {
+        throw new Error('返回第一页时未检测到列表更新');
+      }
+    }
+
+    if (getCurrentPageNumber() !== 1) {
+      throw new Error('未能定位到第一页');
+    }
+  }
+
   function isNextButtonDisabled(button) {
     if (!button) {
       return true;
@@ -244,6 +273,15 @@
     await updateCrawlStatus({
       state: 'running',
       message: '开始抓取试玩管理列表',
+      sourceUrl: window.location.href,
+      pageNo: getCurrentPageNumber(),
+    });
+
+    await gotoFirstPage();
+
+    await updateCrawlStatus({
+      state: 'running',
+      message: '已回到第一页，开始全量抓取',
       sourceUrl: window.location.href,
       pageNo: getCurrentPageNumber(),
     });

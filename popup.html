@@ -176,6 +176,12 @@
       background: #fff;
     }
 
+    .filter-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
     .result-summary {
       font-size: 12px;
       color: var(--muted);
@@ -338,14 +344,21 @@
     <section class="section">
       <h2>本地搜索</h2>
       <div class="search-form">
-        <input class="input" id="searchAppId" placeholder="按 AppID 精确搜索">
-        <input class="input" id="searchGameName" placeholder="按试玩游戏名包含搜索">
+        <input class="input" id="searchKeyword" placeholder="搜索 AppID 或试玩游戏名">
+        <div class="filter-row">
+          <select class="input" id="filterPublishStatus">
+            <option value="">全部发布状态</option>
+          </select>
+          <select class="input" id="filterPlanRelation">
+            <option value="">全部广告计划关联状态</option>
+          </select>
+        </div>
         <div class="btn-row">
           <button class="btn btn-primary" id="btnSearch">搜索</button>
           <button class="btn btn-secondary" id="btnResetSearch">清空条件</button>
         </div>
       </div>
-      <div class="hint">规则：AppID 精确匹配；试玩游戏名不区分大小写包含匹配。</div>
+      <div class="hint">规则：单关键字混合匹配 AppID 与试玩游戏名，并支持按发布状态、是否关联广告计划筛选。</div>
     </section>
 
     <section class="section">
