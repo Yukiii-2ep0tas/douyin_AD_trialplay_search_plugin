@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "抖音开放平台 - 登录与试玩管理助手",
+  "version": "1.0.0",
+  "description": "保存登录状态，并抓取、检索抖音开放平台试玩管理列表",
+  "permissions": [
+    "cookies",
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.open-douyin.com/*",
+    "*://*.douyin.com/*",
+    "*://*.bytedance.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "抖音开放平台助手",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.open-douyin.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
