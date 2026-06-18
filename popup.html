@@ -29,8 +29,8 @@
     }
 
     body {
-      width: 560px;
-      min-height: 560px;
+      width: 640px;
+      min-height: 700px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
@@ -97,13 +97,14 @@
       padding: 10px;
       display: grid;
       grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto minmax(0, 1fr);
       gap: 10px;
       height: calc(100% - 60px);
       align-content: start;
     }
 
     body:not(.embedded) .content {
-      min-height: calc(560px - 60px);
+      min-height: calc(700px - 60px);
     }
 
     .section {
@@ -248,7 +249,7 @@
     .result-list {
       display: grid;
       gap: 6px;
-      max-height: 170px;
+      max-height: 250px;
       overflow-y: auto;
     }
 
@@ -282,7 +283,8 @@
       border-radius: 8px;
       background: #fbfcff;
       padding: 8px;
-      max-height: 214px;
+      max-height: 260px;
+      min-height: 260px;
       overflow: auto;
       font-size: 11px;
       line-height: 1.45;
@@ -339,13 +341,14 @@
       background: var(--danger);
     }
 
+    #sectionResults,
+    #sectionDetail,
     #sectionSearch {
-      grid-column: 1 / span 2;
+      min-height: 0;
     }
 
-    #sectionResults,
     #sectionDetail {
-      min-height: 0;
+      grid-column: 1 / span 2;
     }
   </style>
 </head>

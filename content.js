@@ -84,8 +84,8 @@
         }
 
         .panel {
-          width: 580px;
-          height: 560px;
+          width: 660px;
+          height: 700px;
           border-radius: 18px;
           overflow: hidden;
           background: #fff;
