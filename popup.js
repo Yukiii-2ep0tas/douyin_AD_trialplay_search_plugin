@@ -2,6 +2,7 @@
 // 抖音开放平台 - 登录与试玩管理助手 (Popup)
 // ============================================================
 
+const btnToggleLogin = document.getElementById('btnToggleLogin');
 const btnSave = document.getElementById('btnSave');
 const btnRestore = document.getElementById('btnRestore');
 const btnClearCookies = document.getElementById('btnClearCookies');
@@ -21,17 +22,24 @@ const crawlSummary = document.getElementById('crawlSummary');
 const capturedAt = document.getElementById('capturedAt');
 const crawlHint = document.getElementById('crawlHint');
 const searchKeyword = document.getElementById('searchKeyword');
+const filterToolbar = document.getElementById('filterToolbar');
 const filterPublishStatus = document.getElementById('filterPublishStatus');
 const filterPlanRelation = document.getElementById('filterPlanRelation');
 const resultSummary = document.getElementById('resultSummary');
 const resultList = document.getElementById('resultList');
-const detailActions = document.getElementById('detailActions');
-const detailBox = document.getElementById('detailBox');
+const detailTitle = document.getElementById('detailTitle');
+const detailSubtitle = document.getElementById('detailSubtitle');
+const detailFields = document.getElementById('detailFields');
 const toast = document.getElementById('toast');
+
+const LOGIN_VISIBILITY_KEY = 'douyin-helper-login-visible';
 
 let toastTimer = null;
 let selectedResultId = null;
 let overviewRefreshTimer = null;
+let currentResults = [];
+let searchToolbarVisible = false;
+
 const pageParams = new URLSearchParams(window.location.search);
 const isEmbeddedMode = pageParams.get('embedded') === '1';
 
@@ -71,6 +79,15 @@ function formatTime(timestamp) {
   return `${month}/${day} ${hours}:${minutes}`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getItemDisplayAppId(item) {
   return String(
     item?.appId ||
@@ -87,6 +104,52 @@ function getItemDisplayGameName(item) {
     item?.fields?.['游戏试玩名称'] ||
     ''
   ).trim() || '未命名试玩游戏';
+}
+
+function getItemPublishStatus(item) {
+  return String(item?.fields?.['发布状态'] || '').trim();
+}
+
+function getItemPlanRelation(item) {
+  return String(item?.fields?.['是否关联广告计划'] || '').trim();
+}
+
+function getStatusTagClass(value) {
+  if (value === '已上线' || value === '已发布') {
+    return 'success';
+  }
+  if (value === '未发布' || value === '新创建') {
+    return 'warning';
+  }
+  return '';
+}
+
+function getSortedOperations(item) {
+  const operations = Array.isArray(item?.operations) ? item.operations : [];
+  const rank = {
+    edit: 0,
+    delete: 1,
+    changeLog: 2,
+  };
+  return [...operations].sort((left, right) => (rank[left.key] ?? 99) - (rank[right.key] ?? 99));
+}
+
+function setLoginPanelVisible(visible) {
+  const enabled = Boolean(visible);
+  document.body.classList.toggle('login-collapsed', !enabled);
+  btnToggleLogin?.classList.toggle('active', enabled);
+  btnToggleLogin.textContent = enabled ? '登录开' : '登录关';
+  localStorage.setItem(LOGIN_VISIBILITY_KEY, enabled ? '1' : '0');
+}
+
+function initializeLoginPanelVisibility() {
+  const stored = localStorage.getItem(LOGIN_VISIBILITY_KEY);
+  setLoginPanelVisible(stored === '1');
+}
+
+function setSearchToolbarVisible(visible) {
+  searchToolbarVisible = Boolean(visible);
+  filterToolbar.classList.toggle('visible', searchToolbarVisible);
 }
 
 function isTargetPageUrl(url) {
@@ -210,7 +273,7 @@ function setPageState(tab, pageState) {
   if (!isTarget) {
     pageInfo.textContent = '当前标签页不是试玩管理页';
     btnStartCrawl.disabled = true;
-    crawlHint.textContent = '请切到 https://developer.open-douyin.com/demogame/list?tab=demogameManage 再抓取。';
+    crawlHint.textContent = '请切到试玩管理页面后再抓取。';
     return;
   }
 
@@ -239,117 +302,116 @@ function renderFilterSelect(selectNode, values, defaultLabel, currentValue = '')
   const safeValues = Array.isArray(values) ? values : [];
   selectNode.innerHTML = [
     `<option value="">${defaultLabel}</option>`,
-    ...safeValues.map((value) => `<option value="${value}">${value}</option>`),
+    ...safeValues.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`),
   ].join('');
   selectNode.value = safeValues.includes(currentValue) ? currentValue : '';
 }
 
-function renderEmptyResults(message) {
-  resultSummary.textContent = message;
-  resultList.innerHTML = `<div class="empty">${message}</div>`;
-  detailActions.innerHTML = '<button class="btn btn-secondary" disabled>先选择一个搜索结果</button>';
-  detailBox.textContent = '点击上方结果项后，在这里查看字段详情和原始文本。';
-  selectedResultId = null;
-}
-
-function renderDetailActions(item) {
-  const operations = Array.isArray(item?.operations) ? item.operations : [];
-  if (!operations.length) {
-    detailActions.innerHTML = '<button class="btn btn-secondary" disabled>未抓取到操作信息</button>';
-    return;
-  }
-
-  detailActions.innerHTML = operations.map((operation) => `
-    <button
-      class="btn ${operation.clickable ? 'btn-primary' : 'btn-secondary'}"
-      data-action-key="${operation.key}"
-      ${operation.clickable ? '' : 'disabled'}
-      title="${operation.href || '该动作无独立超链接，执行时复用页面原点击事件'}"
-    >
-      ${operation.label}${operation.clickable ? '' : '（不可执行）'}
-    </button>
-  `).join('');
-
-  detailActions.querySelectorAll('[data-action-key]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      const actionKey = button.dataset.actionKey;
-      await handleExecuteAction(item, actionKey, button);
-    });
-  });
+function renderEmptyDetail(message) {
+  detailTitle.textContent = '结果详情';
+  detailSubtitle.textContent = '选择一条记录后查看字段详情';
+  detailFields.innerHTML = `<div class="detail-placeholder">${escapeHtml(message)}</div>`;
 }
 
 function renderDetail(item) {
   if (!item) {
-    detailActions.innerHTML = '<button class="btn btn-secondary" disabled>未找到动作信息</button>';
-    detailBox.textContent = '未找到记录详情。';
+    renderEmptyDetail('选择搜索结果后，这里会显示结构化字段，不再展示原始文本。');
     return;
   }
 
-  const fieldsText = Object.entries(item.fields || {})
-    .map(([key, value]) => `${key}: ${value || '-'}`)
-    .join('\n');
+  detailTitle.textContent = getItemDisplayGameName(item);
+  detailSubtitle.textContent = getItemDisplayAppId(item);
 
-  detailBox.textContent = [
-    `AppID: ${getItemDisplayAppId(item)}`,
-    `试玩游戏名: ${getItemDisplayGameName(item)}`,
-    `所在页码: ${item.pageNo || '-'}`,
-    `页内序号: ${item.itemIndex ?? '-'}`,
-    '',
-    '操作信息：',
-    ...(Array.isArray(item.operations) && item.operations.length
-      ? item.operations.map((operation) => {
-        const linkPart = operation.href ? `href=${operation.href}` : 'href=无（DOM 事件）';
-        const clickablePart = operation.clickable ? '可执行' : '不可执行';
-        return `${operation.label}: ${clickablePart}, ${linkPart}`;
-      })
-      : ['-']),
-    '',
-    '字段详情：',
-    fieldsText || '-',
-    '',
-    '原始文本：',
-    item.rawText || '-',
-  ].join('\n');
+  const fields = {
+    AppID: getItemDisplayAppId(item),
+    试玩游戏名: getItemDisplayGameName(item),
+    发布状态: getItemPublishStatus(item) || '-',
+    是否关联广告计划: getItemPlanRelation(item) || '-',
+    所在页码: item.pageNo ? `第 ${item.pageNo} 页` : '-',
+    页内序号: Number.isFinite(item.itemIndex) ? String(item.itemIndex) : '-',
+    MaterialID: item.fields?.MaterialID || '-',
+    描述: item.fields?.描述 || '-',
+  };
 
-  renderDetailActions(item);
+  detailFields.innerHTML = Object.entries(fields).map(([label, value]) => `
+    <div class="field-item">
+      <div class="field-label">${escapeHtml(label)}</div>
+      <div class="field-value">${escapeHtml(value || '-')}</div>
+    </div>
+  `).join('');
+}
+
+function renderEmptyResults(message) {
+  currentResults = [];
+  selectedResultId = null;
+  resultSummary.textContent = message;
+  resultList.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+  renderEmptyDetail('选择搜索结果后，这里会显示结构化字段，不再展示原始文本。');
 }
 
 function renderResults(items) {
-  if (!items.length) {
+  currentResults = Array.isArray(items) ? items : [];
+  if (!currentResults.length) {
     renderEmptyResults('未找到匹配结果');
     return;
   }
 
-  if (!selectedResultId) {
-    selectedResultId = items[0].id;
+  if (!selectedResultId || !currentResults.some((item) => item.id === selectedResultId)) {
+    selectedResultId = currentResults[0].id;
   }
 
-  resultSummary.textContent = `找到 ${items.length} 条结果`;
-  resultList.innerHTML = items.map((item) => `
-    <div class="result-item ${item.id === selectedResultId ? 'active' : ''}" data-id="${item.id}">
-      <div class="result-title">${getItemDisplayGameName(item)}</div>
-      <div class="result-meta">
-        AppID: ${getItemDisplayAppId(item)}<br>
-        所在页码: 第 ${item.pageNo || '-'} 页<br>
-        发布状态: ${item.fields?.['发布状态'] || '-'}
+  resultSummary.textContent = `找到 ${currentResults.length} 条结果`;
+  resultList.innerHTML = currentResults.map((item) => `
+    <div class="result-item ${item.id === selectedResultId ? 'active' : ''}" data-id="${escapeHtml(item.id)}">
+      <div class="result-main">
+        <div class="result-title">${escapeHtml(getItemDisplayGameName(item))}</div>
+        <div class="result-appid">${escapeHtml(getItemDisplayAppId(item))}</div>
+        <div class="result-meta">
+          <span class="tag ${getStatusTagClass(getItemPublishStatus(item))}">${escapeHtml(getItemPublishStatus(item) || '未知状态')}</span>
+          <span class="tag">${escapeHtml(getItemPlanRelation(item) || '未知关联')}</span>
+          <span class="tag">第 ${escapeHtml(item.pageNo || '-')} 页</span>
+        </div>
+      </div>
+      <div class="result-actions-inline">
+        ${getSortedOperations(item).map((operation) => `
+          <button
+            class="action-btn ${operation.key === 'edit' ? 'primary' : ''}"
+            data-result-id="${escapeHtml(item.id)}"
+            data-action-key="${escapeHtml(operation.key)}"
+            ${operation.clickable ? '' : 'disabled'}
+          >${escapeHtml(operation.key === 'changeLog' ? '显示日志' : operation.label)}</button>
+        `).join('')}
       </div>
     </div>
   `).join('');
 
   resultList.querySelectorAll('.result-item').forEach((node) => {
-    node.addEventListener('click', async () => {
-      selectedResultId = node.dataset.id;
-      const detail = await sendBackground('getDemogameItemDetail', { id: selectedResultId });
-      if (detail?.success) {
-        renderResults(items);
-        renderDetail(detail.item);
-      } else {
-        showToast(detail?.message || detail?.error || '加载详情失败', 'error');
-      }
+    node.addEventListener('click', () => {
+      const id = node.dataset.id;
+      selectedResultId = id;
+      renderResults(currentResults);
+      renderDetail(currentResults.find((item) => item.id === id) || null);
     });
   });
 
-  renderDetail(items.find((item) => item.id === selectedResultId) || items[0]);
+  resultList.querySelectorAll('[data-action-key]').forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const actionKey = button.dataset.actionKey;
+      const itemId = button.dataset.resultId;
+      const item = currentResults.find((candidate) => candidate.id === itemId);
+      if (!item) {
+        showToast('未找到要执行的记录', 'error');
+        return;
+      }
+      selectedResultId = item.id;
+      renderResults(currentResults);
+      renderDetail(item);
+      await handleExecuteAction(item, actionKey, button);
+    });
+  });
+
+  renderDetail(currentResults.find((item) => item.id === selectedResultId) || currentResults[0]);
 }
 
 async function handleExecuteAction(item, actionKey, button) {
@@ -361,7 +423,7 @@ async function handleExecuteAction(item, actionKey, button) {
 
   button.disabled = true;
   const originalText = button.textContent;
-  button.textContent = '执行中...';
+  button.textContent = '执行中';
 
   const result = await sendToTargetTab('executeDemogameAction', { item, actionKey });
 
@@ -407,7 +469,7 @@ async function refreshOverview() {
     filterPlanRelation.value
   );
 
-  if (!summary?.hasData) {
+  if (!summary?.hasData && !currentResults.length) {
     renderEmptyResults('暂无抓取数据，请先执行抓取。');
   }
 
@@ -474,6 +536,8 @@ async function handleStartCrawl() {
 async function handleClearDataset() {
   const result = await sendBackground('clearDemogameDataset');
   showToast(result?.message || result?.error || '清空失败', result?.success ? 'success' : 'error');
+  currentResults = [];
+  setSearchToolbarVisible(false);
   renderEmptyResults('暂无抓取数据，请先执行抓取。');
   await refreshOverview();
 }
@@ -482,6 +546,8 @@ async function handleSearch() {
   const queryText = searchKeyword.value.trim();
   const publishStatus = filterPublishStatus.value.trim();
   const planRelation = filterPlanRelation.value.trim();
+  setSearchToolbarVisible(true);
+
   const result = await sendBackground('searchDemogameItems', {
     queryText,
     publishStatus,
@@ -501,9 +567,14 @@ function handleResetSearch() {
   searchKeyword.value = '';
   filterPublishStatus.value = '';
   filterPlanRelation.value = '';
-  renderEmptyResults('搜索条件已清空。请重新输入条件。');
+  currentResults = [];
+  setSearchToolbarVisible(false);
+  renderEmptyResults('搜索条件已清空。请输入新的关键词。');
 }
 
+btnToggleLogin?.addEventListener('click', () => {
+  setLoginPanelVisible(document.body.classList.contains('login-collapsed'));
+});
 btnSave.addEventListener('click', handleSaveCookies);
 btnRestore.addEventListener('click', handleRestoreCookies);
 btnClearCookies.addEventListener('click', handleClearCookies);
@@ -513,6 +584,16 @@ btnClearDataset.addEventListener('click', handleClearDataset);
 btnSearch.addEventListener('click', handleSearch);
 btnResetSearch.addEventListener('click', handleResetSearch);
 btnClosePanel?.addEventListener('click', notifyParentToClose);
+filterPublishStatus.addEventListener('change', () => {
+  if (searchToolbarVisible) {
+    handleSearch();
+  }
+});
+filterPlanRelation.addEventListener('change', () => {
+  if (searchToolbarVisible) {
+    handleSearch();
+  }
+});
 searchKeyword.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     handleSearch();
@@ -520,7 +601,9 @@ searchKeyword.addEventListener('keydown', (event) => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+  initializeLoginPanelVisibility();
   refreshOverview();
+  renderEmptyDetail('选择搜索结果后，这里会显示结构化字段，不再展示原始文本。');
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {

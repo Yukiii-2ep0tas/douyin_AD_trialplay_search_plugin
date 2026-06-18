@@ -286,8 +286,16 @@ async function searchAndAssert(popupPage, keyword, expectedGameName) {
   await popupPage.waitForTimeout(500);
   const summary = await popupPage.locator('#resultSummary').innerText();
   const resultText = await popupPage.locator('#resultList').innerText();
+  const toolbarVisible = await popupPage.locator('#filterToolbar').evaluate((node) => node.classList.contains('visible'));
   if (!summary.includes('找到') || !resultText.includes(expectedGameName)) {
     throw new Error(`关键字「${keyword}」搜索结果不包含目标游戏「${expectedGameName}」`);
+  }
+  if (!toolbarVisible) {
+    throw new Error('搜索后筛选器工具栏未显示');
+  }
+  const detailText = await popupPage.locator('#detailFields').innerText();
+  if (detailText.includes('原始文本')) {
+    throw new Error('详情区仍然显示原始文本');
   }
   return { summary, resultText };
 }
@@ -309,7 +317,7 @@ async function applyFiltersAndAssert(popupPage, item) {
 }
 
 async function executeFirstClickableAction(popupPage, targetPage) {
-  const buttons = await popupPage.locator('#detailActions [data-action-key]').elementHandles();
+  const buttons = await popupPage.locator('.result-item.active [data-action-key]').elementHandles();
   for (const button of buttons) {
     const disabled = await button.evaluate((node) => node.hasAttribute('disabled'));
     if (disabled) {
@@ -329,6 +337,28 @@ async function executeFirstClickableAction(popupPage, targetPage) {
     }
   }
   throw new Error('未检测到可执行动作带来的页面变化');
+}
+
+async function assertPopupLayout(popupPage) {
+  const collapsed = await popupPage.evaluate(() => document.body.classList.contains('login-collapsed'));
+  if (!collapsed) {
+    throw new Error('登录卡片默认未折叠');
+  }
+
+  const toolbarVisible = await popupPage.locator('#filterToolbar').evaluate((node) => node.classList.contains('visible'));
+  if (toolbarVisible) {
+    throw new Error('搜索前筛选器工具栏不应显示');
+  }
+
+  await popupPage.click('#btnToggleLogin');
+  await popupPage.waitForTimeout(150);
+  const loginVisible = await popupPage.locator('#sectionLogin').isVisible();
+  if (!loginVisible) {
+    throw new Error('登录开关未能显示登录卡片');
+  }
+
+  await popupPage.click('#btnToggleLogin');
+  await popupPage.waitForTimeout(150);
 }
 
 async function main() {
@@ -372,6 +402,7 @@ async function main() {
 
     const popupPage = await context.newPage();
     await popupPage.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: 'load' });
+    await assertPopupLayout(popupPage);
     await screenshot(popupPage, '02-popup-initial');
 
     logStep('清理旧数据', '通过扩展后台清空旧抓取数据');

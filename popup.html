@@ -8,13 +8,16 @@
     :root {
       --bg: #f5f7fa;
       --panel: #ffffff;
+      --panel-soft: #fbfcff;
       --text: #1d2129;
       --muted: #86909c;
       --border: #e5e6eb;
       --primary: #fe2c55;
       --primary-dark: #d91b44;
       --success: #00b42a;
+      --warning: #ff7d00;
       --danger: #f53f3f;
+      --shadow: 0 10px 24px rgba(15, 35, 95, 0.08);
     }
 
     * {
@@ -29,8 +32,8 @@
     }
 
     body {
-      width: 640px;
-      min-height: 700px;
+      width: 720px;
+      min-height: 760px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
@@ -42,6 +45,14 @@
       min-height: 100%;
     }
 
+    body.login-collapsed #sectionLogin {
+      display: none;
+    }
+
+    body.login-collapsed #sectionCrawl {
+      grid-column: 1 / span 2;
+    }
+
     .header {
       padding: 10px 12px;
       background: linear-gradient(135deg, var(--primary), #ff6b83);
@@ -50,6 +61,13 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
     }
 
     .header-main {
@@ -93,25 +111,53 @@
       display: none;
     }
 
+    .mini-toggle {
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+
+    .mini-toggle::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .mini-toggle.active::before {
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+    }
+
     .content {
       padding: 10px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      grid-template-rows: auto auto minmax(0, 1fr);
       gap: 10px;
       height: calc(100% - 60px);
       align-content: start;
     }
 
     body:not(.embedded) .content {
-      min-height: calc(700px - 60px);
+      min-height: calc(760px - 60px);
     }
 
     .section {
       background: var(--panel);
-      border-radius: 10px;
-      padding: 10px;
-      box-shadow: 0 1px 4px rgba(15, 35, 95, 0.08);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: var(--shadow);
       min-width: 0;
     }
 
@@ -121,13 +167,9 @@
       line-height: 1.2;
     }
 
-    .section.compact {
-      padding-bottom: 8px;
-    }
-
     .meta-list {
       display: grid;
-      gap: 5px;
+      gap: 6px;
     }
 
     .meta-item {
@@ -172,19 +214,19 @@
     }
 
     .btn-group {
-      margin-top: 8px;
+      margin-top: 10px;
     }
 
     .btn {
       border: 1px solid transparent;
-      border-radius: 8px;
-      padding: 7px 9px;
+      border-radius: 10px;
+      padding: 8px 10px;
       font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
       flex: 1;
-      min-width: 90px;
+      min-width: 88px;
     }
 
     .btn:disabled {
@@ -214,103 +256,273 @@
     }
 
     .hint {
-      margin-top: 6px;
+      margin-top: 8px;
       color: var(--muted);
       font-size: 10px;
-      line-height: 1.4;
+      line-height: 1.45;
     }
 
-    .search-form {
-      display: grid;
-      gap: 6px;
+    .search-panel {
+      grid-column: 1 / span 2;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
     }
 
-    .input {
-      width: 100%;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 12px;
+    .search-hero {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px 8px 14px;
+      border: 1px solid #dde3ec;
+      border-radius: 999px;
       background: #fff;
+      box-shadow: 0 3px 12px rgba(15, 35, 95, 0.06);
     }
 
-    .filter-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+    .search-hero:focus-within {
+      border-color: #c9d8ff;
+      box-shadow: 0 6px 18px rgba(49, 112, 255, 0.12);
+    }
+
+    .search-icon {
+      color: var(--muted);
+      font-size: 15px;
+      flex: 0 0 auto;
+    }
+
+    .search-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      min-width: 0;
+    }
+
+    .search-submit {
+      flex: 0 0 auto;
+      min-width: 88px;
+      border-radius: 999px;
+      padding-inline: 14px;
+    }
+
+    .toolbar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-soft);
+    }
+
+    .toolbar.visible {
+      display: flex;
+    }
+
+    .toolbar .input,
+    .toolbar .btn {
+      flex: 0 1 auto;
+      min-width: 150px;
+    }
+
+    .toolbar .btn {
+      min-width: 92px;
+    }
+
+    .results-pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
       gap: 8px;
     }
 
     .result-summary {
       font-size: 11px;
       color: var(--muted);
-      margin-bottom: 6px;
     }
 
     .result-list {
       display: grid;
-      gap: 6px;
-      max-height: 250px;
+      gap: 8px;
+      max-height: 290px;
       overflow-y: auto;
     }
 
     .result-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px;
-      background: #fbfcff;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
       cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
     }
 
     .result-item.active {
-      border-color: var(--primary);
-      background: #fff3f6;
+      border-color: rgba(254, 44, 85, 0.45);
+      background: #fff7f8;
+      box-shadow: 0 6px 18px rgba(254, 44, 85, 0.08);
+    }
+
+    .result-main {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+      flex: 1;
     }
 
     .result-title {
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 3px;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .result-appid {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
 
     .result-meta {
-      font-size: 11px;
-      color: var(--muted);
-      line-height: 1.35;
-    }
-
-    .detail-box {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: #fbfcff;
-      padding: 8px;
-      max-height: 260px;
-      min-height: 260px;
-      overflow: auto;
-      font-size: 11px;
-      line-height: 1.45;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .detail-actions {
       display: flex;
-      gap: 6px;
       flex-wrap: wrap;
-      margin-bottom: 8px;
+      gap: 6px;
     }
 
-    .detail-actions .btn {
-      flex: 1 1 88px;
-      min-width: 88px;
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #f2f3f5;
+      color: #4e5969;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .tag.success {
+      background: rgba(0, 180, 42, 0.12);
+      color: var(--success);
+    }
+
+    .tag.warning {
+      background: rgba(255, 125, 0, 0.12);
+      color: var(--warning);
+    }
+
+    .result-actions-inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .action-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .action-btn.primary {
+      border-color: rgba(254, 44, 85, 0.2);
+      color: var(--primary);
+      background: rgba(254, 44, 85, 0.06);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
 
     .empty {
-      padding: 14px 8px;
+      padding: 18px 10px;
       text-align: center;
       color: var(--muted);
       font-size: 11px;
       border: 1px dashed var(--border);
-      border-radius: 8px;
+      border-radius: 12px;
+      background: #fcfcfd;
+    }
+
+    .detail-panel {
+      grid-column: 1 / span 2;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .detail-title {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .detail-subtitle {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .detail-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .field-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-soft);
+      padding: 8px 10px;
+      min-width: 0;
+    }
+
+    .field-label {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.2;
+    }
+
+    .field-value {
+      margin-top: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .detail-placeholder {
+      padding: 24px 10px;
+      text-align: center;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 11px;
       background: #fcfcfd;
     }
 
@@ -340,23 +552,16 @@
     .toast.error {
       background: var(--danger);
     }
-
-    #sectionResults,
-    #sectionDetail,
-    #sectionSearch {
-      min-height: 0;
-    }
-
-    #sectionDetail {
-      grid-column: 1 / span 2;
-    }
   </style>
 </head>
-<body>
+<body class="login-collapsed">
   <div class="header">
-    <div class="header-main">
-      <h1>抖音开放平台助手</h1>
-      <p>登录持久化、试玩管理抓取与本地检索</p>
+    <div class="header-left">
+      <button class="mini-toggle" id="btnToggleLogin" type="button" aria-label="显示或隐藏登录卡片">登录</button>
+      <div class="header-main">
+        <h1>抖音开放平台助手</h1>
+        <p>登录持久化、试玩管理抓取与本地检索</p>
+      </div>
     </div>
     <div class="header-actions">
       <button class="icon-btn hidden" id="btnClosePanel" title="关闭面板" aria-label="关闭面板">×</button>
@@ -364,7 +569,7 @@
   </div>
 
   <div class="content">
-    <section class="section compact" id="sectionLogin">
+    <section class="section" id="sectionLogin">
       <h2>登录状态</h2>
       <div class="meta-list">
         <div class="meta-item">
@@ -387,7 +592,7 @@
       </div>
     </section>
 
-    <section class="section compact" id="sectionCrawl">
+    <section class="section" id="sectionCrawl">
       <h2>试玩管理抓取</h2>
       <div class="meta-list">
         <div class="meta-item">
@@ -415,40 +620,41 @@
       <div class="hint" id="crawlHint">请切到试玩管理页面后执行抓取。抓取过程中请勿手动翻页。</div>
     </section>
 
-    <section class="section compact" id="sectionSearch">
-      <h2>本地搜索</h2>
-      <div class="search-form">
-        <input class="input" id="searchKeyword" placeholder="搜索 AppID 或试玩游戏名">
-        <div class="filter-row">
-          <select class="input" id="filterPublishStatus">
-            <option value="">全部发布状态</option>
-          </select>
-          <select class="input" id="filterPlanRelation">
-            <option value="">全部广告计划关联状态</option>
-          </select>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="btnSearch">搜索</button>
-          <button class="btn btn-secondary" id="btnResetSearch">清空条件</button>
-        </div>
+    <section class="section search-panel" id="sectionExplorer">
+      <div class="search-hero">
+        <span class="search-icon">⌕</span>
+        <input class="search-input" id="searchKeyword" placeholder="搜索 AppID 或试玩游戏名" autocomplete="off">
+        <button class="btn btn-primary search-submit" id="btnSearch">搜索</button>
       </div>
-      <div class="hint">规则：单关键字混合匹配 AppID 与试玩游戏名，并支持按发布状态、是否关联广告计划筛选。</div>
-    </section>
 
-    <section class="section compact" id="sectionResults">
-      <h2>搜索结果</h2>
-      <div class="result-summary" id="resultSummary">暂无搜索结果</div>
-      <div class="result-list" id="resultList">
-        <div class="empty">先抓取，再输入搜索条件。</div>
+      <div class="toolbar" id="filterToolbar">
+        <select class="input" id="filterPublishStatus">
+          <option value="">全部发布状态</option>
+        </select>
+        <select class="input" id="filterPlanRelation">
+          <option value="">全部广告计划关联状态</option>
+        </select>
+        <button class="btn btn-secondary" id="btnResetSearch">清空筛选</button>
+      </div>
+
+      <div class="results-pane">
+        <div class="result-summary" id="resultSummary">输入关键词后开始搜索</div>
+        <div class="result-list" id="resultList">
+          <div class="empty">先抓取数据，再输入 AppID 或试玩游戏名进行搜索。</div>
+        </div>
       </div>
     </section>
 
-    <section class="section compact" id="sectionDetail">
-      <h2>结果详情</h2>
-      <div class="detail-actions" id="detailActions">
-        <button class="btn btn-secondary" disabled>先选择一个搜索结果</button>
+    <section class="section detail-panel" id="sectionDetail">
+      <div class="detail-header">
+        <div>
+          <div class="detail-title" id="detailTitle">结果详情</div>
+          <div class="detail-subtitle" id="detailSubtitle">选择一条记录后查看字段详情</div>
+        </div>
       </div>
-      <div class="detail-box" id="detailBox">点击上方结果项后，在这里查看字段详情和原始文本。</div>
+      <div class="detail-fields" id="detailFields">
+        <div class="detail-placeholder">选择搜索结果后，这里会显示结构化字段，不再展示原始文本。</div>
+      </div>
     </section>
   </div>
 
