@@ -213,6 +213,73 @@ async function readDatasetFromPopup(popupPage) {
   }));
 }
 
+async function clearDatasetViaExtension(popupPage) {
+  return popupPage.evaluate(() => new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: 'clearDemogameDataset' }, (response) => {
+      resolve(response || null);
+    });
+  }));
+}
+
+async function startCrawlViaExtension(popupPage) {
+  return popupPage.evaluate(async () => {
+    const isTargetPageUrl = (url) => {
+      try {
+        const parsed = new URL(url);
+        return parsed.hostname.includes('developer.open-douyin.com')
+          && parsed.pathname === '/demogame/list'
+          && parsed.searchParams.get('tab') === 'demogameManage';
+      } catch (error) {
+        return false;
+      }
+    };
+
+    const getPageInfo = (tabId) => new Promise((resolve) => {
+      chrome.tabs.sendMessage(tabId, { action: 'getPageInfo' }, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
+        resolve(response || null);
+      });
+    });
+
+    const currentWindowTabs = await chrome.tabs.query({ currentWindow: true });
+    const allTabs = await chrome.tabs.query({});
+    const candidateMap = new Map();
+
+    [...currentWindowTabs, ...allTabs]
+      .filter((tab) => isTargetPageUrl(tab.url || ''))
+      .forEach((tab) => candidateMap.set(tab.id, tab));
+
+    const candidates = Array.from(candidateMap.values());
+    let targetTab = null;
+
+    for (const tab of candidates) {
+      const pageInfo = await getPageInfo(tab.id);
+      if (pageInfo?.isTargetPage && pageInfo?.hasTable) {
+        targetTab = tab;
+        break;
+      }
+    }
+
+    targetTab = targetTab || candidates[0] || null;
+    if (!targetTab?.id) {
+      return { success: false, error: '未找到可用的试玩管理页标签' };
+    }
+
+    return new Promise((resolve) => {
+      chrome.tabs.sendMessage(targetTab.id, { action: 'startDemogameCrawl' }, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({ success: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+        resolve(response || null);
+      });
+    });
+  });
+}
+
 async function searchAndAssert(popupPage, keyword, expectedGameName) {
   await popupPage.fill('#searchKeyword', keyword);
   await popupPage.click('#btnSearch');
@@ -307,14 +374,19 @@ async function main() {
     await popupPage.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: 'load' });
     await screenshot(popupPage, '02-popup-initial');
 
-    logStep('清理旧数据', '通过 popup 清空旧抓取数据');
-    await popupPage.click('#btnClearDataset');
-    await popupPage.waitForTimeout(400);
+    logStep('清理旧数据', '通过扩展后台清空旧抓取数据');
+    const clearResult = await clearDatasetViaExtension(popupPage);
+    if (!clearResult?.success) {
+      throw new Error(clearResult?.error || clearResult?.message || '清理旧数据失败');
+    }
     report.steps.push({ step: 'clear-dataset' });
 
-    logStep('执行抓取', '通过 popup 触发全量抓取');
+    logStep('执行抓取', '通过扩展消息链触发全量抓取');
     const crawlStartedAt = Date.now();
-    await popupPage.click('#btnStartCrawl');
+    const crawlResult = await startCrawlViaExtension(popupPage);
+    if (!crawlResult?.success) {
+      throw new Error(crawlResult?.error || crawlResult?.message || '扩展抓取失败');
+    }
     await waitForFreshDatasetAfterCrawl(popupPage, crawlStartedAt);
     const datasetState = await readDatasetFromPopup(popupPage);
     report.datasetSummary = {
@@ -327,7 +399,7 @@ async function main() {
       })),
     };
     await screenshot(popupPage, '03-crawl-finished');
-    report.steps.push({ step: 'crawl-finished' });
+    report.steps.push({ step: 'crawl-finished', crawlResult });
 
     logStep('抽取非首页样本', '从最后一页提取一个样本，用于验证跨页搜索');
     await targetPage.bringToFront();
