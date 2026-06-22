@@ -79,13 +79,16 @@
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 12px;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
           touch-action: none;
           user-select: none;
+          pointer-events: none;
         }
 
         .panel {
+          position: absolute;
+          right: 0;
+          bottom: calc(100% + 12px);
           width: min(400px, calc(100vw - 32px));
           height: min(760px, calc(100vh - 104px));
           max-width: calc(100vw - 32px);
@@ -97,14 +100,17 @@
           border: 1px solid rgba(29, 33, 41, 0.08);
           opacity: 0;
           transform: translateY(8px) scale(0.98);
+          visibility: hidden;
           pointer-events: none;
-          transition: opacity 0.18s ease, transform 0.18s ease;
+          transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.18s;
         }
 
         .panel.open {
           opacity: 1;
           transform: translateY(0) scale(1);
+          visibility: visible;
           pointer-events: auto;
+          transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0s;
         }
 
         iframe {
@@ -128,6 +134,7 @@
           box-shadow: 0 12px 28px rgba(254, 44, 85, 0.35);
           cursor: pointer;
           white-space: nowrap;
+          pointer-events: auto;
         }
 
         .fab:hover {
