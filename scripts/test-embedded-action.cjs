@@ -51,6 +51,19 @@ async function openEmbeddedPanel(page) {
   }, { timeout: 10000 });
 }
 
+async function closeEmbeddedPanel(page) {
+  await page.evaluate(() => {
+    const host = document.getElementById('douyin-open-helper-host');
+    host.shadowRoot.getElementById('helperFab').click();
+  });
+
+  await page.waitForFunction(() => {
+    const host = document.getElementById('douyin-open-helper-host');
+    const panel = host?.shadowRoot?.getElementById('helperPanel');
+    return Boolean(panel && !panel.classList.contains('open'));
+  }, { timeout: 10000 });
+}
+
 async function assertFabLabelAndDrag(page) {
   const before = await page.evaluate(() => {
     const host = document.getElementById('douyin-open-helper-host');
@@ -128,6 +141,42 @@ async function assertPanelClosed(page) {
   });
   if (!closed) {
     throw new Error('执行动作后网页内悬浮面板未自动关闭');
+  }
+}
+
+async function assertClosedPanelDoesNotBlockPage(page) {
+  const panelCenter = await page.evaluate(() => {
+    const host = document.getElementById('douyin-open-helper-host');
+    const panel = host?.shadowRoot?.getElementById('helperPanel');
+    if (!panel || !panel.classList.contains('open')) {
+      return null;
+    }
+    const rect = panel.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  });
+
+  if (!panelCenter) {
+    throw new Error('无法在关闭前读取面板区域');
+  }
+
+  await closeEmbeddedPanel(page);
+
+  const hit = await page.evaluate(({ x, y }) => {
+    const host = document.getElementById('douyin-open-helper-host');
+    const target = document.elementFromPoint(x, y);
+    return {
+      tagName: target?.tagName || '',
+      id: target?.id || '',
+      className: typeof target?.className === 'string' ? target.className : '',
+      blockedByHost: Boolean(target && host && (target === host || host.contains(target))),
+    };
+  }, panelCenter);
+
+  if (hit.blockedByHost) {
+    throw new Error(`关闭面板后仍由插件宿主拦截页面点击: ${JSON.stringify(hit)}`);
   }
 }
 
@@ -275,6 +324,8 @@ async function main() {
     await assertFabLabelAndDrag(page);
     await openEmbeddedPanel(page);
     await assertPanelInsideViewport(page);
+    await assertClosedPanelDoesNotBlockPage(page);
+    await openEmbeddedPanel(page);
 
     const extensionId = await getExtensionId(context);
     const frame = await waitForEmbeddedFrame(page, extensionId);
