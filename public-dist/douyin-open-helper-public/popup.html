@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>抖音开放平台助手</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --panel-soft: #fbfcff;
+      --text: #1d2129;
+      --muted: #86909c;
+      --border: #e5e6eb;
+      --primary: #fe2c55;
+      --primary-dark: #d91b44;
+      --success: #00b42a;
+      --warning: #ff7d00;
+      --danger: #f53f3f;
+      --shadow: 0 10px 24px rgba(15, 35, 95, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      width: 400px;
+      min-height: 780px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    body.embedded {
+      width: 100%;
+      min-height: 100%;
+    }
+
+    body.login-collapsed #sectionLogin {
+      display: none;
+    }
+
+    body.login-collapsed #sectionCrawl {
+      grid-column: 1 / span 2;
+    }
+
+    .header {
+      padding: 10px 12px;
+      background: linear-gradient(135deg, var(--primary), #ff6b83);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .header-main {
+      min-width: 0;
+    }
+
+    .header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .header p {
+      margin-top: 2px;
+      font-size: 11px;
+      opacity: 0.9;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-btn.hidden {
+      display: none;
+    }
+
+    .mini-toggle {
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+
+    .mini-toggle::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .mini-toggle.active::before {
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+    }
+
+    .content {
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      min-height: calc(100% - 60px);
+      height: auto;
+      align-content: start;
+    }
+
+    body:not(.embedded) .content {
+      min-height: calc(780px - 60px);
+    }
+
+    .section {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .section h2 {
+      font-size: 13px;
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
+
+    .meta-list {
+      display: grid;
+      gap: 5px;
+    }
+
+    .meta-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .meta-item .label {
+      color: var(--muted);
+    }
+
+    .meta-item .value {
+      font-weight: 600;
+      text-align: right;
+      word-break: break-word;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    .status-dot.on {
+      background: var(--success);
+      box-shadow: 0 0 6px rgba(0, 180, 42, 0.4);
+    }
+
+    .status-dot.off {
+      background: #c9cdd4;
+    }
+
+    .btn-row,
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-group {
+      margin-top: 8px;
+    }
+
+    .btn {
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex: 1;
+      min-width: 88px;
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-dark);
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .btn-danger {
+      background: #fff5f5;
+      color: var(--danger);
+      border-color: #ffd8d8;
+    }
+
+    .hint {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
+    .search-panel {
+      grid-column: 1 / span 2;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+    }
+
+    .search-hero {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px 8px 14px;
+      border: 1px solid #dde3ec;
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: 0 3px 12px rgba(15, 35, 95, 0.06);
+    }
+
+    .search-hero:focus-within {
+      border-color: #c9d8ff;
+      box-shadow: 0 6px 18px rgba(49, 112, 255, 0.12);
+    }
+
+    .search-icon {
+      color: var(--muted);
+      font-size: 15px;
+      flex: 0 0 auto;
+    }
+
+    .search-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      min-width: 0;
+    }
+
+    .search-submit {
+      flex: 0 0 auto;
+      min-width: 88px;
+      border-radius: 999px;
+      padding-inline: 14px;
+    }
+
+    .toolbar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-soft);
+    }
+
+    .toolbar.visible {
+      display: flex;
+    }
+
+    .toolbar .input,
+    .toolbar .btn {
+      flex: 0 1 auto;
+      min-width: 150px;
+    }
+
+    .toolbar .btn {
+      min-width: 92px;
+    }
+
+    .results-pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      gap: 8px;
+    }
+
+    .result-summary {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .result-list {
+      display: grid;
+      gap: 6px;
+      max-height: none;
+      overflow: visible;
+    }
+
+    .result-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 10px;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+
+    .result-item.active {
+      border-color: rgba(254, 44, 85, 0.45);
+      background: #fff7f8;
+      box-shadow: 0 6px 18px rgba(254, 44, 85, 0.08);
+    }
+
+    .result-main {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .result-title {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .result-appid {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .result-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #f2f3f5;
+      color: #4e5969;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .tag.success {
+      background: rgba(0, 180, 42, 0.12);
+      color: var(--success);
+    }
+
+    .tag.warning {
+      background: rgba(255, 125, 0, 0.12);
+      color: var(--warning);
+    }
+
+    .result-actions-inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .action-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .action-btn.primary {
+      border-color: rgba(254, 44, 85, 0.2);
+      color: var(--primary);
+      background: rgba(254, 44, 85, 0.06);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .empty {
+      padding: 18px 10px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: #fcfcfd;
+    }
+
+    .detail-panel {
+      grid-column: 1 / span 2;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .detail-title {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .detail-subtitle {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .detail-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .field-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-soft);
+      padding: 7px 8px;
+      min-width: 0;
+    }
+
+    .field-label {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.2;
+    }
+
+    .field-value {
+      margin-top: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+
+    .detail-placeholder {
+      padding: 24px 10px;
+      text-align: center;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 11px;
+      background: #fcfcfd;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      background: #1d2129;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    .toast.success {
+      background: var(--success);
+    }
+
+    .toast.error {
+      background: var(--danger);
+    }
+
+    @media (max-width: 460px) {
+      .header {
+        gap: 8px;
+      }
+
+      .header p {
+        display: none;
+      }
+
+      .content {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      body:not(.embedded) .content {
+        min-height: auto;
+      }
+
+      body.login-collapsed #sectionCrawl,
+      .search-panel,
+      .detail-panel {
+        grid-column: auto;
+      }
+
+      .search-hero {
+        flex-wrap: wrap;
+        border-radius: 20px;
+      }
+
+      .search-submit {
+        width: 100%;
+      }
+
+      .toolbar .input,
+      .toolbar .btn {
+        min-width: 0;
+        flex: 1 1 calc(50% - 8px);
+      }
+
+      .result-item {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .result-actions-inline {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .detail-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body class="login-collapsed">
+  <div class="header">
+    <div class="header-left">
+      <button class="mini-toggle" id="btnToggleLogin" type="button" aria-label="显示或隐藏登录卡片">登录</button>
+      <div class="header-main">
+        <h1>抖音开放平台助手</h1>
+        <p>登录持久化、试玩管理抓取与本地检索</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn hidden" id="btnClosePanel" title="关闭面板" aria-label="关闭面板">×</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <section class="section" id="sectionLogin">
+      <h2>登录状态</h2>
+      <div class="meta-list">
+        <div class="meta-item">
+          <span class="label">状态</span>
+          <span class="value" id="loginStatus"><span class="status-dot off"></span>检测中...</span>
+        </div>
+        <div class="meta-item">
+          <span class="label">当前 Cookie 数</span>
+          <span class="value" id="cookieCount">-</span>
+        </div>
+        <div class="meta-item">
+          <span class="label">登录快照</span>
+          <span class="value" id="savedInfo">尚未保存</span>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btnSave">保存登录</button>
+        <button class="btn btn-secondary" id="btnRestore">恢复登录</button>
+        <button class="btn btn-danger" id="btnClearCookies">清除 Cookie</button>
+      </div>
+    </section>
+
+    <section class="section" id="sectionCrawl">
+      <h2>试玩管理抓取</h2>
+      <div class="meta-list">
+        <div class="meta-item">
+          <span class="label">目标页面</span>
+          <span class="value" id="pageInfo">检测中...</span>
+        </div>
+        <div class="meta-item">
+          <span class="label">抓取状态</span>
+          <span class="value" id="crawlStatus">等待抓取</span>
+        </div>
+        <div class="meta-item">
+          <span class="label">总页数 / 总条数</span>
+          <span class="value" id="crawlSummary">0 / 0</span>
+        </div>
+        <div class="meta-item">
+          <span class="label">最近抓取</span>
+          <span class="value" id="capturedAt">-</span>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btnStartCrawl">开始抓取</button>
+        <button class="btn btn-secondary" id="btnRefresh">刷新状态</button>
+        <button class="btn btn-danger" id="btnClearDataset">清空抓取数据</button>
+      </div>
+      <div class="hint" id="crawlHint">请切到试玩管理页面后执行抓取。抓取过程中请勿手动翻页。</div>
+    </section>
+
+    <section class="section search-panel" id="sectionExplorer">
+      <div class="search-hero">
+        <span class="search-icon">⌕</span>
+        <input class="search-input" id="searchKeyword" placeholder="搜索 AppID 或试玩游戏名" autocomplete="off">
+        <button class="btn btn-primary search-submit" id="btnSearch">搜索</button>
+      </div>
+
+      <div class="toolbar" id="filterToolbar">
+        <select class="input" id="filterPublishStatus">
+          <option value="">全部发布状态</option>
+        </select>
+        <select class="input" id="filterPlanRelation">
+          <option value="">全部广告计划关联状态</option>
+        </select>
+        <button class="btn btn-secondary" id="btnResetSearch">清空筛选</button>
+      </div>
+
+      <div class="results-pane">
+        <div class="result-summary" id="resultSummary">输入关键词后开始搜索</div>
+        <div class="result-list" id="resultList">
+          <div class="empty">先抓取数据，再输入 AppID 或试玩游戏名进行搜索。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section detail-panel" id="sectionDetail">
+      <div class="detail-header">
+        <div>
+          <div class="detail-title" id="detailTitle">结果详情</div>
+          <div class="detail-subtitle" id="detailSubtitle">选择一条记录后查看字段详情</div>
+        </div>
+      </div>
+      <div class="detail-fields" id="detailFields">
+        <div class="detail-placeholder">选择搜索结果后，这里会显示结构化字段，不再展示原始文本。</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

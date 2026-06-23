@@ -1,0 +1,732 @@
+// ============================================================
+// 抖音开放平台 - 登录与试玩管理助手 (Content Script)
+// ============================================================
+
+(function () {
+  'use strict';
+
+  const TARGET_PATH = '/demogame/list';
+  const TARGET_TAB = 'demogameManage';
+  const TABLE_SELECTOR = 'table.semi-dy-open-table[role="treegrid"]';
+  const HEADER_SELECTOR = 'thead [role="columnheader"], thead th';
+  const ROW_SELECTOR = 'tbody tr.semi-dy-open-table-row';
+  const CELL_SELECTOR = 'td.semi-dy-open-table-row-cell';
+  const ACTIVE_PAGE_SELECTOR = '.semi-dy-open-page-item.semi-dy-open-page-item-active';
+  const PREVIOUS_BUTTON_SELECTORS = [
+    'li[aria-label="Previous"]',
+    'li.semi-dy-open-page-prev',
+  ];
+  const NEXT_BUTTON_SELECTORS = [
+    'li[aria-label="Next"]',
+    'li.semi-dy-open-page-next',
+  ];
+  const ACTION_LABELS = {
+    edit: '修改',
+    changeLog: '变更日志',
+    delete: '删除',
+  };
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function normalizeText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function buildRowId(record) {
+    return [record.appId || 'unknown-app', record.pageNo || 0, record.itemIndex || 0].join('-');
+  }
+
+  function isTargetPage() {
+    const url = new URL(window.location.href);
+    return url.pathname === TARGET_PATH && url.searchParams.get('tab') === TARGET_TAB;
+  }
+
+  function ensureFloatingAssistant() {
+    const hostId = 'douyin-open-helper-host';
+    let host = document.getElementById(hostId);
+
+    if (!isTargetPage()) {
+      if (host) {
+        host.remove();
+      }
+      return;
+    }
+
+    if (host) {
+      return;
+    }
+
+    host = document.createElement('div');
+    host.id = hostId;
+    document.documentElement.appendChild(host);
+
+    const shadow = host.attachShadow({ mode: 'open' });
+    const iframeUrl = chrome.runtime.getURL('popup.html?embedded=1');
+
+    shadow.innerHTML = `
+      <style>
+        :host {
+          all: initial;
+        }
+
+        .dock {
+          position: fixed;
+          right: 20px;
+          bottom: 24px;
+          z-index: 2147483647;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          touch-action: none;
+          user-select: none;
+          pointer-events: none;
+        }
+
+        .panel {
+          position: absolute;
+          right: 0;
+          bottom: calc(100% + 12px);
+          width: min(400px, calc(100vw - 32px));
+          height: min(760px, calc(100vh - 104px));
+          max-width: calc(100vw - 32px);
+          max-height: calc(100vh - 104px);
+          border-radius: 18px;
+          overflow: hidden;
+          background: #fff;
+          box-shadow: 0 20px 64px rgba(15, 35, 95, 0.18);
+          border: 1px solid rgba(29, 33, 41, 0.08);
+          opacity: 0;
+          transform: translateY(8px) scale(0.98);
+          visibility: hidden;
+          pointer-events: none;
+          transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.18s;
+        }
+
+        .panel.open {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          visibility: visible;
+          pointer-events: auto;
+          transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0s;
+        }
+
+        iframe {
+          width: 100%;
+          height: 100%;
+          border: 0;
+          background: #f5f7fa;
+        }
+
+        .fab {
+          min-width: 96px;
+          height: 46px;
+          padding: 0 16px;
+          border: none;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #fe2c55, #ff6b83);
+          color: #fff;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.2px;
+          box-shadow: 0 12px 28px rgba(254, 44, 85, 0.35);
+          cursor: pointer;
+          white-space: nowrap;
+          pointer-events: auto;
+        }
+
+        .fab:hover {
+          filter: brightness(0.98);
+        }
+
+        .fab:active {
+          transform: scale(0.98);
+        }
+
+        @media (max-width: 720px) {
+          .dock {
+            right: 12px;
+            bottom: 16px;
+          }
+
+          .panel {
+            width: calc(100vw - 24px);
+            max-width: calc(100vw - 24px);
+            height: min(720px, calc(100vh - 96px));
+            max-height: calc(100vh - 96px);
+          }
+
+          .fab {
+            min-width: 88px;
+            height: 42px;
+            padding: 0 14px;
+          }
+        }
+      </style>
+      <div class="dock">
+        <div class="panel" id="helperPanel">
+          <iframe src="${iframeUrl}" title="抖音开放平台助手"></iframe>
+        </div>
+        <button class="fab" id="helperFab" type="button" aria-label="打开搜索助手">搜索助手</button>
+      </div>
+    `;
+
+    const dock = shadow.querySelector('.dock');
+    const panel = shadow.getElementById('helperPanel');
+    const fab = shadow.getElementById('helperFab');
+    let open = false;
+    let suppressClick = false;
+    let dragState = null;
+
+    const setOpen = (value) => {
+      open = Boolean(value);
+      panel.classList.toggle('open', open);
+      fab.textContent = open ? '收起助手' : '搜索助手';
+      fab.setAttribute('aria-label', open ? '收起搜索助手' : '打开搜索助手');
+    };
+
+    fab.addEventListener('click', () => {
+      if (suppressClick) {
+        suppressClick = false;
+        return;
+      }
+      setOpen(!open);
+    });
+
+    const clampDockPosition = (left, top) => {
+      const dockRect = dock.getBoundingClientRect();
+      const maxLeft = Math.max(8, window.innerWidth - dockRect.width - 8);
+      const maxTop = Math.max(8, window.innerHeight - dockRect.height - 8);
+      return {
+        left: Math.min(Math.max(8, left), maxLeft),
+        top: Math.min(Math.max(8, top), maxTop),
+      };
+    };
+
+    const setDockPosition = (left, top) => {
+      const next = clampDockPosition(left, top);
+      dock.style.left = `${next.left}px`;
+      dock.style.top = `${next.top}px`;
+      dock.style.right = 'auto';
+      dock.style.bottom = 'auto';
+    };
+
+    fab.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+      const rect = dock.getBoundingClientRect();
+      dragState = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        left: rect.left,
+        top: rect.top,
+        moved: false,
+      };
+      fab.setPointerCapture(event.pointerId);
+    });
+
+    fab.addEventListener('pointermove', (event) => {
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+      const deltaX = event.clientX - dragState.startX;
+      const deltaY = event.clientY - dragState.startY;
+      if (!dragState.moved && Math.hypot(deltaX, deltaY) < 6) {
+        return;
+      }
+      dragState.moved = true;
+      suppressClick = true;
+      setDockPosition(dragState.left + deltaX, dragState.top + deltaY);
+    });
+
+    const finishDrag = (event) => {
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+      if (dragState.moved) {
+        const deltaX = event.clientX - dragState.startX;
+        const deltaY = event.clientY - dragState.startY;
+        setDockPosition(dragState.left + deltaX, dragState.top + deltaY);
+      }
+      dragState = null;
+      fab.releasePointerCapture(event.pointerId);
+    };
+
+    fab.addEventListener('pointerup', finishDrag);
+    fab.addEventListener('pointercancel', finishDrag);
+
+    const extensionOrigin = new URL(chrome.runtime.getURL('popup.html')).origin;
+
+    window.addEventListener('message', (event) => {
+      if (!event.data || event.origin !== extensionOrigin) {
+        return;
+      }
+      if (
+        event.data.source === 'douyin-open-helper'
+        && event.data.action === 'close-embedded-panel'
+      ) {
+        setOpen(false);
+      }
+    });
+  }
+
+  function getTargetTable() {
+    return document.querySelector(TABLE_SELECTOR);
+  }
+
+  function getHeaders(table) {
+    return Array.from(table.querySelectorAll(HEADER_SELECTOR))
+      .map((cell) => normalizeText(cell.textContent))
+      .filter(Boolean);
+  }
+
+  function getCurrentPageNumber() {
+    const activeItem = document.querySelector(ACTIVE_PAGE_SELECTOR);
+    const pageNumber = Number.parseInt(normalizeText(activeItem?.textContent || ''), 10);
+    return Number.isFinite(pageNumber) ? pageNumber : 1;
+  }
+
+  function getNextButton() {
+    for (const selector of NEXT_BUTTON_SELECTORS) {
+      const node = document.querySelector(selector);
+      if (node) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  function getPreviousButton() {
+    for (const selector of PREVIOUS_BUTTON_SELECTORS) {
+      const node = document.querySelector(selector);
+      if (node) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  async function gotoFirstPage() {
+    let attempts = 0;
+    while (getCurrentPageNumber() !== 1 && attempts < 30) {
+      attempts += 1;
+      const table = getTargetTable();
+      const beforeSignature = getTableSignature(table);
+      const firstPageButton = getPageButton(1);
+
+      if (firstPageButton) {
+        firstPageButton.click();
+      } else {
+        const previousButton = getPreviousButton();
+        if (isNextButtonDisabled(previousButton)) {
+          throw new Error('无法回到第一页');
+        }
+        previousButton.click();
+      }
+
+      const changed = await waitForPageChange(beforeSignature, 1);
+      if (!changed) {
+        throw new Error('返回第一页时未检测到列表更新');
+      }
+    }
+
+    if (getCurrentPageNumber() !== 1) {
+      throw new Error('未能定位到第一页');
+    }
+  }
+
+  function isNextButtonDisabled(button) {
+    if (!button) {
+      return true;
+    }
+    const ariaDisabled = button.getAttribute('aria-disabled');
+    return ariaDisabled === 'true' || button.classList.contains('semi-dy-open-page-item-disabled');
+  }
+
+  function getTableSignature(table) {
+    const rowTexts = Array.from(table?.querySelectorAll(ROW_SELECTOR) || [])
+      .slice(0, 5)
+      .map((row) => normalizeText(row.innerText))
+      .filter(Boolean);
+    return rowTexts.join(' || ');
+  }
+
+  function isElementDisabled(element) {
+    if (!element) {
+      return true;
+    }
+
+    const ariaDisabled = element.getAttribute('aria-disabled');
+    const style = window.getComputedStyle(element);
+    return (
+      ariaDisabled === 'true' ||
+      element.classList.contains('semi-dy-open-typography-disabled') ||
+      style.pointerEvents === 'none' ||
+      style.cursor === 'not-allowed'
+    );
+  }
+
+  function findActionCandidate(actionCell, actionKey) {
+    const label = ACTION_LABELS[actionKey];
+    const candidates = Array.from(actionCell.querySelectorAll('a, button, [tabindex], span'))
+      .filter((element) => normalizeText(element.textContent) === label);
+
+    const score = (element) => {
+      let current = 0;
+      if (element.tagName === 'A') current += 100;
+      if (element.tagName === 'BUTTON') current += 95;
+      if (element.hasAttribute('tabindex')) current += 85;
+      if (!isElementDisabled(element)) current += 20;
+      if (window.getComputedStyle(element).cursor === 'pointer') current += 10;
+      return current;
+    };
+
+    return candidates.sort((left, right) => score(right) - score(left))[0] || null;
+  }
+
+  function extractOperations(actionCell) {
+    return Object.entries(ACTION_LABELS).map(([key, label]) => {
+      const element = findActionCandidate(actionCell, key);
+      const hrefAttr = element?.getAttribute('href') || '';
+      const absoluteHref = hrefAttr
+        ? new URL(hrefAttr, window.location.href).toString()
+        : null;
+
+      return {
+        key,
+        label,
+        href: absoluteHref,
+        hrefAttr: hrefAttr || null,
+        executionMode: 'dom-click',
+        clickable: Boolean(element) && !isElementDisabled(element),
+      };
+    });
+  }
+
+  function parseRow(row, headers, pageNo, itemIndex) {
+    const cells = Array.from(row.querySelectorAll(CELL_SELECTOR));
+    const fields = {};
+
+    headers.forEach((header, index) => {
+      fields[header] = normalizeText(cells[index]?.innerText || '');
+    });
+
+    const appId = fields['App ID'] || '';
+    const gameName = fields['试玩游戏名'] || '';
+    const actionCell = cells[cells.length - 1];
+
+    return {
+      id: buildRowId({ appId, pageNo, itemIndex }),
+      appId,
+      gameName,
+      pageNo,
+      itemIndex,
+      rawText: normalizeText(row.innerText),
+      fields,
+      operations: actionCell ? extractOperations(actionCell) : [],
+      capturedAt: Date.now(),
+    };
+  }
+
+  function extractCurrentPageItems() {
+    const table = getTargetTable();
+    if (!table) {
+      throw new Error('未找到试玩管理表格');
+    }
+
+    const headers = getHeaders(table);
+    if (!headers.length) {
+      throw new Error('未找到表头，无法结构化解析');
+    }
+
+    const pageNo = getCurrentPageNumber();
+    const rows = Array.from(table.querySelectorAll(ROW_SELECTOR));
+
+    return {
+      pageNo,
+      headers,
+      items: rows.map((row, index) => parseRow(row, headers, pageNo, index)),
+      signature: getTableSignature(table),
+    };
+  }
+
+  async function waitForPageChange(previousSignature, expectedPageNo) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await sleep(400);
+      const table = getTargetTable();
+      if (!table) {
+        continue;
+      }
+
+      const currentSignature = getTableSignature(table);
+      const currentPageNo = getCurrentPageNumber();
+      const contentChanged = currentSignature && currentSignature !== previousSignature;
+      if (contentChanged && (!expectedPageNo || currentPageNo === expectedPageNo)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  async function updateCrawlStatus(payload) {
+    return chrome.runtime.sendMessage({
+      action: 'setCrawlStatus',
+      payload,
+    });
+  }
+
+  async function saveDataset(dataset) {
+    return chrome.runtime.sendMessage({
+      action: 'saveDemogameDataset',
+      payload: dataset,
+    });
+  }
+
+  async function crawlDemogameList() {
+    if (!isTargetPage()) {
+      throw new Error('当前页面不是试玩管理页');
+    }
+
+    const table = getTargetTable();
+    if (!table) {
+      throw new Error('当前页面未渲染出试玩管理表格');
+    }
+
+    const items = [];
+    const seenIds = new Set();
+    let totalPages = 0;
+
+    await updateCrawlStatus({
+      state: 'running',
+      message: '开始抓取试玩管理列表',
+      sourceUrl: window.location.href,
+      pageNo: getCurrentPageNumber(),
+    });
+
+    await gotoFirstPage();
+
+    await updateCrawlStatus({
+      state: 'running',
+      message: '已回到第一页，开始全量抓取',
+      sourceUrl: window.location.href,
+      pageNo: getCurrentPageNumber(),
+    });
+
+    while (true) {
+      const pageData = extractCurrentPageItems();
+      totalPages = Math.max(totalPages, pageData.pageNo);
+
+      pageData.items.forEach((item) => {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          items.push(item);
+        }
+      });
+
+      await updateCrawlStatus({
+        state: 'running',
+        message: `已抓取第 ${pageData.pageNo} 页，累计 ${items.length} 条`,
+        sourceUrl: window.location.href,
+        pageNo: pageData.pageNo,
+        totalPages: pageData.pageNo,
+        totalItems: items.length,
+      });
+
+      const nextButton = getNextButton();
+      if (isNextButtonDisabled(nextButton)) {
+        break;
+      }
+
+      const previousSignature = pageData.signature;
+      const currentPageNo = pageData.pageNo;
+      nextButton.click();
+      const changed = await waitForPageChange(previousSignature, currentPageNo + 1);
+
+      if (!changed) {
+        throw new Error(`翻到第 ${currentPageNo + 1} 页时未检测到列表更新`);
+      }
+    }
+
+    const dataset = {
+      source: { url: window.location.href },
+      capturedAt: Date.now(),
+      totalPages,
+      items,
+    };
+
+    await saveDataset(dataset);
+
+    return {
+      success: true,
+      totalPages,
+      totalItems: items.length,
+      items,
+      message: `抓取完成，共 ${totalPages} 页，${items.length} 条`,
+    };
+  }
+
+  function getPageButton(pageNo) {
+    return document.querySelector(`li[aria-label="Page ${pageNo}"]`);
+  }
+
+  function findRowByItem(item) {
+    const rows = Array.from(document.querySelectorAll(ROW_SELECTOR));
+    return rows.find((row) => {
+      const cells = Array.from(row.querySelectorAll(CELL_SELECTOR));
+      const rowAppId = normalizeText(cells[0]?.innerText || '');
+      const rowGameName = normalizeText(cells[1]?.innerText || '');
+      return rowAppId === normalizeText(item.appId) && rowGameName === normalizeText(item.gameName);
+    }) || null;
+  }
+
+  async function gotoPage(targetPageNo) {
+    const target = Number(targetPageNo);
+    if (!Number.isFinite(target) || target < 1) {
+      throw new Error('目标页码无效');
+    }
+
+    let attempts = 0;
+    while (getCurrentPageNumber() !== target && attempts < 30) {
+      attempts += 1;
+      const currentPageNo = getCurrentPageNumber();
+      const beforeSignature = getTableSignature(getTargetTable());
+      const directButton = getPageButton(target);
+
+      if (directButton) {
+        directButton.click();
+      } else if (target > currentPageNo) {
+        const nextButton = getNextButton();
+        if (isNextButtonDisabled(nextButton)) {
+          throw new Error(`无法翻到第 ${target} 页`);
+        }
+        nextButton.click();
+      } else {
+        const previousButton = getPreviousButton();
+        if (isNextButtonDisabled(previousButton)) {
+          throw new Error(`无法翻到第 ${target} 页`);
+        }
+        previousButton.click();
+      }
+
+      const changed = await waitForPageChange(beforeSignature, target);
+      if (!changed) {
+        throw new Error(`跳转到第 ${target} 页失败`);
+      }
+    }
+
+    if (getCurrentPageNumber() !== target) {
+      throw new Error(`未能定位到第 ${target} 页`);
+    }
+  }
+
+  async function executeDemogameAction(payload = {}) {
+    if (!isTargetPage()) {
+      throw new Error('当前页面不是试玩管理页');
+    }
+
+    const item = payload.item;
+    const actionKey = payload.actionKey;
+    if (!item?.appId || !item?.gameName) {
+      throw new Error('缺少目标记录信息');
+    }
+    if (!ACTION_LABELS[actionKey]) {
+      throw new Error('不支持的动作类型');
+    }
+
+    await gotoPage(item.pageNo);
+
+    const row = findRowByItem(item);
+    if (!row) {
+      throw new Error(`第 ${item.pageNo} 页未找到目标记录`);
+    }
+
+    const actionCell = row.querySelector('td:last-child');
+    const actionElement = actionCell ? findActionCandidate(actionCell, actionKey) : null;
+    if (!actionElement) {
+      throw new Error(`未找到「${ACTION_LABELS[actionKey]}」动作节点`);
+    }
+    if (isElementDisabled(actionElement)) {
+      throw new Error(`「${ACTION_LABELS[actionKey]}」当前不可执行`);
+    }
+
+    actionElement.click();
+    await sleep(300);
+
+    return {
+      success: true,
+      pageNo: getCurrentPageNumber(),
+      actionKey,
+      actionLabel: ACTION_LABELS[actionKey],
+      message: `已定位到第 ${item.pageNo} 页并触发「${ACTION_LABELS[actionKey]}」`,
+    };
+  }
+
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    (async () => {
+      try {
+        switch (message?.action) {
+          case 'getPageInfo':
+            sendResponse({
+              url: window.location.href,
+              title: document.title,
+              isTargetPage: isTargetPage(),
+              hasTable: Boolean(getTargetTable()),
+              pageNo: getCurrentPageNumber(),
+            });
+            break;
+          case 'startDemogameCrawl':
+            sendResponse(await crawlDemogameList());
+            break;
+          case 'executeDemogameAction':
+            sendResponse(await executeDemogameAction(message.payload));
+            break;
+          default:
+            sendResponse({ success: false, error: '未知操作' });
+        }
+      } catch (error) {
+        console.error('[Assistant] 页面抓取失败:', error);
+        await updateCrawlStatus({
+          state: 'error',
+          message: '抓取失败',
+          sourceUrl: window.location.href,
+          error: error?.message || '未知错误',
+        });
+        sendResponse({
+          success: false,
+          error: error?.message || '抓取失败',
+        });
+      }
+    })();
+
+    return true;
+  });
+
+  const observer = new MutationObserver(() => {
+    const userElements = document.querySelectorAll('[class*="user"], [class*="avatar"], [class*="profile"]');
+    if (userElements.length > 0) {
+      console.debug('[Assistant] 检测到用户相关元素');
+    }
+  });
+
+  if (document.body) {
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  ensureFloatingAssistant();
+
+  setInterval(() => {
+    ensureFloatingAssistant();
+  }, 1500);
+
+  setInterval(() => {
+    chrome.runtime.sendMessage({ action: 'checkLoginState' }, () => {});
+  }, 30000);
+})();
