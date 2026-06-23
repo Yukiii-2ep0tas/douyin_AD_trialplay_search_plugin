@@ -361,10 +361,6 @@ async function searchDemogameItems(payload = {}) {
     return { success: false, message: '暂无抓取数据，请先执行抓取', items: [] };
   }
 
-  if (!queryText && !publishStatus && !planRelation) {
-    return { success: false, message: '请至少输入关键字或选择一个筛选条件', items: [] };
-  }
-
   if (!searchIndex?.entries?.length || searchIndex.totalItems !== dataset.items.length) {
     searchIndex = buildSearchIndex(dataset);
     await chrome.storage.local.set({ [DEMOGAME_SEARCH_INDEX_KEY]: searchIndex });
