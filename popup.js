@@ -578,7 +578,7 @@ function handleResetSearch() {
   filterPlanRelation.value = '';
   currentResults = [];
   setSearchToolbarVisible(false);
-  renderEmptyResults('搜索条件已清空。请输入新的关键词。');
+  renderEmptyResults('搜索条件已清空。可直接点击搜索查看全部结果，或输入关键词后再搜索。');
 }
 
 btnToggleLogin?.addEventListener('click', () => {

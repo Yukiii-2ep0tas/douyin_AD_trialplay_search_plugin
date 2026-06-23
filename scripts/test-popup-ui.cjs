@@ -99,7 +99,6 @@ async function main() {
     }
 
     await page.click('#btnToggleLogin');
-    await page.fill('#searchKeyword', '试玩');
     await page.click('#btnSearch');
     await page.waitForTimeout(400);
 
@@ -108,9 +107,22 @@ async function main() {
       throw new Error('搜索后应显示筛选器');
     }
 
+    const allResultItems = await page.locator('.result-item').count();
+    if (allResultItems !== 8) {
+      throw new Error(`空搜索应展示全部结果，实际只有 ${allResultItems} 条`);
+    }
+
+    await page.selectOption('#filterPublishStatus', '已上线');
+    await page.waitForTimeout(300);
+
+    const filteredResultItems = await page.locator('.result-item').count();
+    if (filteredResultItems !== 4) {
+      throw new Error(`空搜索后按发布状态筛选应得到 4 条结果，实际为 ${filteredResultItems} 条`);
+    }
+
     const resultText = await page.locator('#resultList').innerText();
-    if (!resultText.includes('试玩测试游戏2') || !resultText.includes('显示日志')) {
-      throw new Error('搜索结果未正确显示游戏名和行内动作按钮');
+    if (!resultText.includes('试玩测试游戏3') || !resultText.includes('显示日志')) {
+      throw new Error('空搜索后的筛选结果未正确显示游戏名和行内动作按钮');
     }
 
     const detailText = await page.locator('#detailFields').innerText();
